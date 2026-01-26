@@ -4,11 +4,154 @@
 // Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
-generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
-}
-
 datasource db {
   provider = "postgresql"
+}
+
+generator client {
+  provider        = "prisma-client-js"
+  engineType      = "library"
+}
+
+
+// Enums for strict typing (Helps with Dropdowns in UI)
+enum UserRole {
+  STUDENT
+  ADMIN
+  STAFF
+}
+
+enum IssueStatus {
+  REPORTED
+  ASSIGNED
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  EMERGENCY
+}
+
+enum Visibility {
+  PUBLIC
+  PRIVATE
+}
+
+enum LostFoundStatus {
+  LOST
+  FOUND
+  CLAIMED
+}
+
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  name           String?
+  password       String   // Hash this!
+  role           UserRole @default(STUDENT)
+  
+  // Profile Info (Critical for "Automatic Tagging")
+  hostelName     String?  // e.g., "Boys Hostel 1"
+  blockName      String?  // e.g., "Block A"
+  roomNumber     String?  // e.g., "302"
+  
+  // Relations
+  reportedIssues Issue[]  @relation("Reporter")
+  assignedIssues Issue[]  @relation("Assignee") // For Staff/Admin
+  comments       Comment[]
+  upvotes        Upvote[] // For the "Me Too" feature
+  lostItems      LostItem[]
+
+  createdAt      DateTime @default(now())
+}
+
+model Issue {
+  id          String      @id @default(cuid())
+  title       String
+  description String
+  category    String      // e.g., Plumbing, Electrical, Wifi
+  priority    Priority    @default(LOW)
+  status      IssueStatus @default(REPORTED)
+  visibility  Visibility  @default(PUBLIC)
+  mediaUrl    String?     // URL from Cloudinary/UploadThing
+
+  // Location Snapshot (Saved at time of report, in case student moves rooms later)
+  hostelName  String
+  blockName   String
+  roomNumber  String
+
+  // Relations
+  reporterId  String
+  reporter    User     @relation("Reporter", fields: [reporterId], references: [id])
+  
+  assigneeId  String?
+  assignee    User?    @relation("Assignee", fields: [assigneeId], references: [id])
+
+  comments    Comment[]
+  upvotes     Upvote[]
+
+  // Logic for "Duplicate Issue Management"
+  // If this issue is a duplicate, link it to the main issue
+  isDuplicate    Boolean @default(false)
+  mergedWithId   String?
+  mergedWith     Issue?  @relation("MergedIssues", fields: [mergedWithId], references: [id])
+  duplicateIssues Issue[] @relation("MergedIssues")
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// For Community Interaction (Value-Added Feature)
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  issueId   String
+  issue     Issue    @relation(fields: [issueId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+// For the "Me Too" Button (Avoids duplicates)
+model Upvote {
+  id        String   @id @default(cuid())
+  issueId   String
+  issue     Issue    @relation(fields: [issueId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  
+  // Ensure a user can only upvote an issue once
+  @@unique([issueId, userId])
+}
+
+model Announcement {
+  id          String   @id @default(cuid())
+  title       String
+  content     String
+  
+  // Targeting
+  targetHostel String? // Null means ALL hostels
+  targetBlock  String? // Null means ALL blocks
+  targetRole   UserRole? // Null means ALL roles
+
+  createdAt   DateTime @default(now())
+}
+
+model LostItem {
+  id          String          @id @default(cuid())
+  title       String
+  description String
+  status      LostFoundStatus @default(LOST)
+  location    String          // Where it was lost/found
+  date        DateTime        // When it was lost/found
+  imageUrl    String?
+
+  reporterId  String
+  reporter    User     @relation(fields: [reporterId], references: [id])
+  
+  createdAt   DateTime @default(now())
 }
