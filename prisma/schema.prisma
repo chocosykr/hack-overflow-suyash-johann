@@ -9,10 +9,65 @@ datasource db {
 }
 
 generator client {
-  provider        = "prisma-client-js"
-  engineType      = "library"
+  provider = "prisma-client-js"
+  engineType ="library"
 }
 
+
+// Enums for strict typing (Helps with Dropdowns in UI)
+enum UserRole {
+  STUDENT
+  ADMIN
+  STAFF
+}
+
+enum IssueStatus {
+  REPORTED
+  ASSIGNED
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  EMERGENCY
+}
+
+enum Visibility {
+  PUBLIC
+  PRIVATE
+}
+
+enum LostFoundStatus {
+  LOST
+  FOUND
+  CLAIMED
+}
+
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  name           String?
+  password       String   // Hash this!
+  role           UserRole @default(STUDENT)
+  
+  // Profile Info (Critical for "Automatic Tagging")
+  hostelName     String?  // e.g., "Boys Hostel 1"
+  blockName      String?  // e.g., "Block A"
+  roomNumber     String?  // e.g., "302"
+  
+  // Relations
+  reportedIssues Issue[]  @relation("Reporter")
+  assignedIssues Issue[]  @relation("Assignee") // For Staff/Admin
+  comments       Comment[]
+  upvotes        Upvote[] // For the "Me Too" feature
+  lostItems      LostItem[]
+
+  createdAt      DateTime @default(now())
+}
 
 // Enums for strict typing (Helps with Dropdowns in UI)
 enum UserRole {
