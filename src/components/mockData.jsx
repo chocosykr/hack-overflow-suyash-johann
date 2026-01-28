@@ -19,3 +19,28 @@ export const recentIssues = [
   { id: "ISS-104", category: "Cleaning", location: "Block A - Corridor", status: "Pending", priority: "Medium", time: "1 day ago" },
   { id: "ISS-105", category: "Furniture", location: "Block D - Common", status: "In Progress", priority: "Low", time: "2 days ago" },
 ];
+
+export const lostFoundItems = [
+  {
+    id: "LF-001",
+    title: "Black Wallet",
+    location: "Canteen",
+    date: "2 days ago",
+    status: "LOST",
+  },
+  {
+    id: "LF-002",
+    title: "Wireless Earbuds",
+    location: "Library",
+    date: "1 day ago",
+    status: "FOUND",
+  },
+  {
+    id: "LF-003",
+    title: "Room Key",
+    location: "Block B – 1st Floor",
+    date: "3 days ago",
+    status: "RETURNED",
+  },
+];
+
