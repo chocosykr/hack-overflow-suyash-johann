@@ -48,7 +48,7 @@ export async function createIssue(formData) {
     }
   })
 
-  revalidatePath('/dashboard/student')
+  revalidatePath('/homepage/student')
   // CHANGE: Return success instead of redirecting
   return { success: true }
 }

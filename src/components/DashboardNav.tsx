@@ -6,11 +6,11 @@ import { Home, PlusCircle, Search, User, Megaphone } from 'lucide-react'
 import { cn } from '../lib/utils' // Standard shadcn utility
 
 const navItems = [
-  { href: '/dashboard/student', label: 'Feed', icon: Home },
-  { href: '/dashboard/search', label: 'Lost & Found', icon: Search },
-  { href: '/dashboard/create', label: 'Report', icon: PlusCircle }, // Center button
-  { href: '/dashboard/notices', label: 'Notices', icon: Megaphone },
-  { href: '/dashboard/profile', label: 'Profile', icon: User },
+  { href: '/homepage/student', label: 'Feed', icon: Home },
+  { href: '/homepage/search', label: 'Lost & Found', icon: Search },
+  { href: '/homepage/create', label: 'Report', icon: PlusCircle }, // Center button
+  { href: '/homepage/notices', label: 'Notices', icon: Megaphone },
+  { href: '/homepage/profile', label: 'Profile', icon: User },
 ]
 
 export default function DashboardNav() {
@@ -62,7 +62,7 @@ export default function DashboardNav() {
         <div className="flex justify-around items-center h-16">
           {navItems.map((item) => {
             const isActive = pathname === item.href
-            const isCenter = item.href === '/dashboard/create'
+            const isCenter = item.href === '/homepage/create'
 
             if (isCenter) {
               return (

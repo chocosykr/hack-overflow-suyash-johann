@@ -47,7 +47,7 @@ export default function CreateIssueForm() {
       
       // 2. Check for success and Redirect manually
       if (result.success) {
-        router.push('/dashboard/student')
+        router.push('/homepage/student')
       }
       
     } catch (error) {

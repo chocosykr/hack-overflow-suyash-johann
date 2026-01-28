@@ -5,7 +5,7 @@ export function middleware(request) {
   const session = request.cookies.get('session')
 
   // 2. Define protected routes
-  const isDashboard = request.nextUrl.pathname.startsWith('/dashboard')
+  const isDashboard = request.nextUrl.pathname.startsWith('/homepage')
   const isLogin = request.nextUrl.pathname.startsWith('/login')
 
   // 3. Logic:
@@ -16,7 +16,7 @@ export function middleware(request) {
 
   // If trying to access Login WITH session -> Redirect to Dashboard
   if (isLogin && session) {
-    return NextResponse.redirect(new URL('/dashboard/student', request.url))
+    return NextResponse.redirect(new URL('/homepage/student', request.url))
   }
 
   return NextResponse.next()
@@ -24,5 +24,5 @@ export function middleware(request) {
 
 // Run this middleware only on specific paths
 export const config = {
-  matcher: ['/dashboard/:path*', '/login'],
+  matcher: ['/homepage/:path*', '/login'],
 }

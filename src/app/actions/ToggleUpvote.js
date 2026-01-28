@@ -36,5 +36,5 @@ export async function ToggleUpvote(issueId) {
   }
 
   // Refresh the UI
-  revalidatePath('/dashboard')
+  revalidatePath('/homepage')
 }

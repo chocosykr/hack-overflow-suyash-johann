@@ -32,8 +32,8 @@ export async function loginAction(prevState,formData) {
     path: '/', // Good practice to add this so it works on all routes
   })
 
-  // 4. Redirect to Dashboard
-  redirect('/dashboard/student')
+  // 4. Redirect to homepage
+  redirect('/homepage/student')
 }
 
 // Simple Logout Logic
