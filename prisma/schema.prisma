@@ -12,9 +12,7 @@ generator client {
   engineType = "library"
 }
 
-
-
-// --- ENUMS (Only Define Once) ---
+// Enums for strict typing (Helps with Dropdowns in UI)
 enum UserRole {
   STUDENT
   ADMIN
@@ -46,8 +44,6 @@ enum LostFoundStatus {
   FOUND
   CLAIMED
 }
-
-// --- MODELS ---
 
 model User {
   id             String    @id @default(cuid())
