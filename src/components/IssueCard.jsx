@@ -10,8 +10,8 @@ import { useOptimistic, startTransition } from "react"
 
 export default function IssueCard({ issue, currentUserId }) {
   // Check if the current user has already upvoted based on the data passed down
-  const initialHasUpvoted = issue.upvotes.length > 0
-  const initialCount = issue._count.upvotes
+  const initialHasUpvoted = (issue.upvotes?.length || 0) > 0;
+  const initialCount = issue._count?.upvotes || 0;
 
   // Optimistic UI state
   const [optimisticState, setOptimisticState] = useOptimistic(

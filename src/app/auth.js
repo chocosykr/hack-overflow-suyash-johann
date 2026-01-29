@@ -22,14 +22,18 @@ export async function auth() {
 
   if (!user) return null
 
-  return {
-    user: {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      hostelName: user.hostelName,
-      blockName: user.blockName,
-      role: user.role
-    }
+return {
+  user: {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    // Use the relational IDs from your new schema
+    hostelId: user.hostelId, 
+    blockId: user.blockId,
+    roomId: user.roomId,
+    // Optional: include the avatar if you plan to use it in the student profile
+    avatar: user.avatar 
   }
 }
+  }
