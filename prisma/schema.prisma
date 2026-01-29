@@ -435,8 +435,8 @@ model LostItemClaim {
   claimant     User        @relation(fields: [claimantId], references: [id], onDelete: Cascade)
   
   // The "Proof"
-  description  String      @db.Text  // "It has a scratch on the back"
-  proofUrls    String[]    // Native array for uploaded proof images
+  description String?     @db.Text           // Added '?' (Nullable)
+  proofUrls   String[]    @default([])
   
   status       ClaimStatus @default(PENDING)
   
