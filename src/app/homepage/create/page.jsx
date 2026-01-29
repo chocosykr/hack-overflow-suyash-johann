@@ -9,7 +9,7 @@ import { Label } from '../../../components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../components/ui/select"
 import { Switch } from "../../../components/ui/switch"
 import { Loader2, UploadCloud, Lock, Globe } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+import { redirect, useRouter } from 'next/navigation'
 
 // Mock Upload Function - Replace this with real UploadThing logic later
 async function uploadImageToCloud(file) {
@@ -43,19 +43,24 @@ export default function CreateIssueForm() {
 
     try {
       // 1. Call the server action
-      const result = await createIssue(formData)
-      
-      // 2. Check for success and Redirect manually
-      if (result.success) {
+      if (result?.success) {
+        // Success Logic
+        alert("Issue reported successfully!")
+        formElement.reset()      // Clear the text fields
+        setPreviewUrl(null)      // Clear the image preview
         router.push('/homepage/student')
+        // Optional: router.push('/dashboard') or similar
+      } else if (result?.error) {
+        // Handle custom errors returned from server (like "Profile incomplete")
+        alert(result.error)
       }
-      
     } catch (error) {
       console.error(error)
-      alert("Failed to submit issue")
+      alert("A network error occurred.")
     } finally {
       setIsSubmitting(false)
     }
+
   }
 
   return (

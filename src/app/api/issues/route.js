@@ -1,8 +1,15 @@
+
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "../../../lib/prisma";
+import { auth } from "../../auth"; // Import your auth utility
 
 export async function GET(request) {
   try {
+
+    const session = await auth(); // Get the actual session
+    const userId = session?.user?.id || null; // Identify the user
+    const role = session?.user?.role || "STUDENT"; // Default to student
+
     const { searchParams } = new URL(request.url);
 
     // Filter & Search Params
@@ -19,9 +26,6 @@ export async function GET(request) {
     const limit = Math.min(100, Math.max(5, Number(searchParams.get("limit") || 25)));
     const skip = (page - 1) * limit;
 
-    // TODO: Replace with real auth logic
-    const userId = null;
-    const role = "STUDENT";
 
     /** ------------------------
      * Build WHERE clause
