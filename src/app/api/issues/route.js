@@ -16,6 +16,7 @@ export async function GET(request) {
     const unresolvedOnly = searchParams.get("unresolved") !== "false";
     const assigneeId = searchParams.get("assigneeId"); // New param
     const specialization = searchParams.get("specialization"); // New param
+    const sort = searchParams.get("sort") || "newest";
 
     // ... (Pagination logic remains the same) ...
     const page = Math.max(1, Number(searchParams.get("page") || 1));
@@ -64,6 +65,11 @@ export async function GET(request) {
 
     };
 
+     /** ------------------------
+     * Handle Sorting & Relations
+     * ------------------------ */
+    const orderBy = sort === "oldest" ? { createdAt: "asc" } : { createdAt: "desc" };
+
     const include = {
       _count: { select: { upvotes: true } },
       // NEW: Fetch the location details
@@ -82,7 +88,7 @@ export async function GET(request) {
 
     const issues = await prisma.issue.findMany({
       where,
-      orderBy: { createdAt: "desc" },
+      orderBy,
       include,
       skip,
       take: limit,
