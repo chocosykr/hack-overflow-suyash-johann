@@ -2,26 +2,37 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, PlusCircle, Search, User, Megaphone } from 'lucide-react'
-import { cn } from '../lib/utils' // Standard shadcn utility
+import { Home, PlusCircle, Search, User, Bell, LogOut } from 'lucide-react'
+import { cn } from '../lib/utils' // Ensure this path matches your project
+import { logoutAction } from '../app/actions/auth'
 
-const navItems = [
-  { href: '/homepage/student', label: 'Feed', icon: Home },
-  { href: '/homepage/search', label: 'Lost & Found', icon: Search },
-  { href: '/homepage/create', label: 'Report', icon: PlusCircle }, // Center button
-  { href: '/homepage/notices', label: 'Notices', icon: Megaphone },
-  { href: '/homepage/profile', label: 'Profile', icon: User },
-]
-
-export default function DashboardNav() {
+export default function DashboardNav({ role, userId }) {
   const pathname = usePathname()
+
+  // Dynamic Home Link based on Role (The logic from Code A)
+  const homeLink = role === 'STAFF' ? '/homepage/staff' : '/homepage/student'
+
+  const navItems = [
+    { name: 'Home', href: homeLink, icon: Home },
+    { name: 'Lost & Found', href: '/homepage/search', icon: Search },
+    { name: 'Report', href: '/homepage/create', icon: PlusCircle },
+    { name: 'Notices', href: '/homepage/notices', icon: Bell },
+    { name: 'Profile', href: '/homepage/profile', icon: User },
+  ]
 
   return (
     <>
-      {/* DESKTOP SIDEBAR (Hidden on Mobile) */}
+      {/* DESKTOP SIDEBAR */}
       <aside className="hidden md:flex flex-col w-64 h-screen fixed left-0 top-0 border-r bg-white z-50">
-        <div className="p-6 border-b">
-          <h1 className="text-2xl font-bold text-blue-600 tracking-tight">Hostel<span className="text-black">Mate</span></h1>
+        <div className="p-6 border-b flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-blue-600 tracking-tight">
+            Hostel<span className="text-black">Mate</span>
+          </h1>
+          {role === 'STAFF' && (
+            <span className="text-[10px] bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full uppercase font-bold">
+              Staff
+            </span>
+          )}
         </div>
         
         <nav className="flex-1 p-4 space-y-2">
@@ -39,26 +50,35 @@ export default function DashboardNav() {
                 )}
               >
                 <item.icon className={cn("w-5 h-5", isActive && "fill-current")} />
-                {item.label}
+                {item.name}
               </Link>
             )
           })}
         </nav>
 
-        <div className="p-4 border-t">
-          {/* Add a Logout Button here later */}
+        {/* Profile & Logout Section */}
+        <div className="p-4 border-t space-y-2">
           <div className="flex items-center gap-3 px-4 py-3 text-sm text-gray-500">
-            <div className="w-8 h-8 rounded-full bg-gray-200" />
-            <div className="flex flex-col">
-              <span className="font-medium text-black">Student User</span>
-              <span className="text-xs">Block A, Room 302</span>
+            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">
+              {role === 'STAFF' ? 'S' : 'U'}
+            </div>
+            <div className="flex flex-col overflow-hidden">
+              <span className="font-medium text-black truncate">User Session</span>
+              <span className="text-xs truncate">{role} Mode</span>
             </div>
           </div>
+          
+          <form action={logoutAction}>
+            <button className="flex w-full items-center gap-3 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+              <LogOut className="w-5 h-5" />
+              Sign Out
+            </button>
+          </form>
         </div>
       </aside>
 
-      {/* MOBILE BOTTOM NAV (Hidden on Desktop) */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t z-50 pb-safe">
+      {/* MOBILE BOTTOM NAV */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t z-50 pb-safe shadow-[0_-2px_10px_rgba(0,0,0,0.05)]">
         <div className="flex justify-around items-center h-16">
           {navItems.map((item) => {
             const isActive = pathname === item.href
@@ -66,12 +86,12 @@ export default function DashboardNav() {
 
             if (isCenter) {
               return (
-                <Link key={item.href} href={item.href}>
-                  <div className="flex flex-col items-center justify-center -mt-6">
-                    <div className="bg-blue-600 rounded-full p-4 shadow-lg text-white transform transition-transform active:scale-95">
+                <Link key={item.href} href={item.href} className="relative">
+                  <div className="flex flex-col items-center justify-center -mt-8">
+                    <div className="bg-blue-600 rounded-full p-4 shadow-lg text-white transform transition-transform active:scale-95 border-4 border-white">
                       <PlusCircle className="w-6 h-6" />
                     </div>
-                    <span className="text-[10px] font-medium mt-1 text-gray-600">Report</span>
+                    <span className="text-[10px] font-bold mt-1 text-blue-600 uppercase tracking-tighter">Report</span>
                   </div>
                 </Link>
               )
@@ -87,7 +107,7 @@ export default function DashboardNav() {
                 )}
               >
                 <item.icon className={cn("w-5 h-5", isActive && "fill-current")} />
-                <span className="text-[10px] font-medium">{item.label}</span>
+                <span className="text-[10px] font-medium">{item.name}</span>
               </Link>
             )
           })}
