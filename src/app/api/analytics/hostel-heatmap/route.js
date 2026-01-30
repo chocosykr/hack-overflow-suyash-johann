@@ -1,5 +1,5 @@
 // /app/api/analytics/hostel-heatmap/route.js
-import { prisma } from "@/lib/prisma";
+import { prisma } from "../../../../lib/prisma";
 
 const OPEN_STATUSES = ["REPORTED", "ASSIGNED", "IN_PROGRESS"];
 const HIGH_PRIORITY = ["HIGH", "EMERGENCY"];

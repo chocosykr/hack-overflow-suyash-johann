@@ -6,8 +6,8 @@ import {
   Search, Filter, Loader2, Building2, 
   ExternalLink, AlertCircle, Clock, ArrowLeft, ArrowUpDown 
 } from "lucide-react";
-import StatusBadge from "@/components/StatusBadge";
-
+import StatusBadge from "../../components/StatusBadge";
+ 
 export default function IssuesPage() {
   const [issues, setIssues] = useState([]);
   const [loading, setLoading] = useState(true);
