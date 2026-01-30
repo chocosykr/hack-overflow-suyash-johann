@@ -63,7 +63,7 @@ export default function RecentReportsTable() {
         </Link>
       </div>
 
-      <div className="overflow-x-auto min-h-[200px] relative">
+      <div className="overflow-x-auto relative max-h-60 overflow-y-auto">
         {loading && (
           <div className="absolute inset-0 bg-white/50 flex items-center justify-center z-10">
             <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />

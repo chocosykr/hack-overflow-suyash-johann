@@ -28,31 +28,38 @@ export async function GET(request) {
      * ------------------------ */
     const where = {
       isDuplicate: false,
-      
-      // Role-based visibility
+
       ...(role !== "ADMIN" && { visibility: "PUBLIC" }),
 
-      // Specific filters
-      ...(hostel && { hostelName: hostel }),
-      ...(block && { blockName: block }),
+      ...(hostel && {
+        hostel: { name: hostel },
+      }),
+
+      ...(block && {
+        block: { name: block },
+      }),
+
       ...(priority && { priority }),
 
-      // Search logic (ID, Title, or Hostel Name)
       ...(search && {
         OR: [
           { id: { contains: search, mode: "insensitive" } },
           { title: { contains: search, mode: "insensitive" } },
-          { hostelName: { contains: search, mode: "insensitive" } },
+          {
+            hostel: {
+              name: { contains: search, mode: "insensitive" },
+            },
+          },
         ],
       }),
 
-      // Status logic: Specific status takes precedence over "unresolvedOnly"
       ...(status && status !== "ALL"
         ? { status }
         : unresolvedOnly && !status
-        ? { status: { notIn: ["RESOLVED", "CLOSED"] } }
-        : {}),
+          ? { status: { notIn: ["RESOLVED", "CLOSED"] } }
+          : {}),
     };
+
 
     /** ------------------------
      * Handle Sorting & Relations
