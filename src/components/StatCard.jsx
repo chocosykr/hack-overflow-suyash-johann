@@ -3,7 +3,7 @@
 import React from "react";
 import PropTypes from "prop-types";
 import { ArrowUpRight } from "lucide-react";
-
+ 
 const StatCard = React.memo(function StatCard({ title, value, subtext, Icon, trend }) {
   const trendClass = trend === "up" ? "text-green-600" : "text-red-600";
   return (

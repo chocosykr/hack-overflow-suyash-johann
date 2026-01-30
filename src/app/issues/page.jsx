@@ -6,8 +6,8 @@ import {
   Search, Filter, Loader2, Building2, 
   ExternalLink, AlertCircle, Clock, ArrowLeft, ArrowUpDown 
 } from "lucide-react";
-import StatusBadge from "@/components/StatusBadge";
-
+import StatusBadge from "../../components/StatusBadge";
+ 
 export default function IssuesPage() {
   const [issues, setIssues] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -116,7 +116,7 @@ export default function IssuesPage() {
 
       {/* Table Section */}
       <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
-        <div className="overflow-x-auto min-h-[400px] relative">
+        <div className="overflow-x-auto min-h-100 relative">
           {loading && (
             <div className="absolute inset-0 bg-white/60 flex items-center justify-center z-10 backdrop-blur-[1px]">
               <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />

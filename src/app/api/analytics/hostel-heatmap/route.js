@@ -1,5 +1,5 @@
 // /app/api/analytics/hostel-heatmap/route.js
-import { prisma } from "@/lib/prisma";
+import { prisma } from "../../../../lib/prisma";
 
 const OPEN_STATUSES = ["REPORTED", "ASSIGNED", "IN_PROGRESS"];
 const HIGH_PRIORITY = ["HIGH", "EMERGENCY"];
@@ -10,24 +10,30 @@ export async function GET() {
       where: {
         visibility: "PUBLIC",
       },
-      select: {
-        hostelName: true,
-        blockName: true,
+      select: { 
         priority: true,
         status: true,
         createdAt: true,
         updatedAt: true,
+        hostel: {
+          select: { name: true },
+        },
+        block: {
+          select: { name: true },
+        },
       },
     });
 
     const map = {};
 
     for (const issue of issues) {
-      const key = `${issue.hostelName}_${issue.blockName}`;
+      const hostelName = issue.hostel?.name ?? "Unknown";
+      const blockName = issue.block?.name ?? "Unknown";
+      const key = `${hostelName}_${blockName}`;
 
       map[key] ??= {
-        hostel: issue.hostelName,
-        block: issue.blockName,
+        hostel: hostelName,
+        block: blockName,
         openCount: 0,
         highPriorityCount: 0,
         resolutionSum: 0,
@@ -36,7 +42,6 @@ export async function GET() {
 
       const cell = map[key];
 
-      // OPEN issues → heatmap intensity
       if (OPEN_STATUSES.includes(issue.status)) {
         cell.openCount++;
 
@@ -45,7 +50,6 @@ export async function GET() {
         }
       }
 
-      // RESOLVED → resolution analytics only
       if (issue.status === "RESOLVED") {
         cell.resolvedCount++;
         cell.resolutionSum +=
@@ -56,7 +60,7 @@ export async function GET() {
     const data = Object.values(map).map(c => ({
       hostel: c.hostel,
       block: c.block,
-      count: c.openCount,                // 🔥 unresolved only
+      count: c.openCount,
       pendingCount: c.openCount,
       highPriorityCount: c.highPriorityCount,
       avgResolutionHours:
@@ -65,7 +69,10 @@ export async function GET() {
           : 0,
     }));
 
-    return new Response(JSON.stringify(data), { status: 200 });
+    return new Response(JSON.stringify(data), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
   } catch (err) {
     console.error(err);
     return new Response(

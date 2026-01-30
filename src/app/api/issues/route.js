@@ -30,6 +30,16 @@ export async function GET(request) {
       ...(hostel && { hostel: { name: hostel } }), 
       ...(block && { block: { name: block } }),
 
+      ...(hostel && {
+        hostel: { name: hostel },
+      }),
+
+      ...(block && {
+        block: { name: block },
+      }),
+
+      ...(priority && { priority }),
+
       ...(search && {
         OR: [
           { title: { contains: search, mode: "insensitive" } },

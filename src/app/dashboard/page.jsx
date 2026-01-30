@@ -7,9 +7,10 @@ import ResolutionStatusPie from "../../components/ResolutionStatusPie";
 import RecentReportsTable from "../../components/RecentReportsTable";
 import HostelHeatmap from "../../components/HostelHeatmap";
 import { Filter, Download } from "lucide-react";
+import LostAndFoundSection from "../../components/LostAndFoundSection";
 
 // mock data imports
-import { categoryData, statusData, recentIssues } from "../../components/mockData";
+import { categoryData, statusData, recentIssues, lostFoundItems } from "../../components/mockData";
 
 /* Simple drill-down placeholder */
 function DrilldownIssues({ hostel, block }) {
@@ -157,6 +158,10 @@ export default function Page() {
 
       {/* Recent issues */}
       <RecentReportsTable issues={recentIssues} />
+
+      <LostAndFoundSection items={lostFoundItems} />
+
+
     </main>
   );
 }

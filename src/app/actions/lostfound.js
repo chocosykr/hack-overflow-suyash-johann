@@ -73,7 +73,6 @@ await prisma.lostItem.create({
   return { success: true }
 }
 
-
 export async function markAsFound(formData) {
   const session = await auth()
   if (!session?.user) throw new Error("Unauthorized")

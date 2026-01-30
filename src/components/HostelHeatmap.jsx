@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import PropTypes from "prop-types";
+import PropTypes from "prop-types"; 
 
 /**
  * Layout:
@@ -106,7 +106,7 @@ export default function HostelHeatmap({ since, until, onCellClick, rightPane }) 
       </div>
 
       {/* RIGHT: DRILLDOWN PANEL */}
-      <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm min-h-75">
+      <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm min-h-75 max-h-75 overflow-y-auto">
         {rightPane ?? (
           <div className="h-full flex items-center justify-center text-sm text-gray-500">
             Select a block to view issues
