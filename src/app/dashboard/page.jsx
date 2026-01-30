@@ -9,7 +9,6 @@ import HostelHeatmap from "../../components/HostelHeatmap";
 import { Filter, Download } from "lucide-react";
 import LostAndFoundSection from "@/components/LostAndFoundSection";
 
-
 // mock data imports
 import { categoryData, statusData, recentIssues, lostFoundItems } from "../../components/mockData";
 
