@@ -18,9 +18,10 @@ export default function IssueDensityChart() {
     let isMounted = true;
 
     fetch("/api/analytics/categories")
-      .then((res) => res.json())
-      .then((json) => {
-        if (isMounted) setData(json);
+      .then(res => res.json())
+      .then(json => {
+        if (!isMounted) return;
+        setData(Array.isArray(json) ? json : []);
       })
       .catch(() => {
         if (isMounted) setData([]);
@@ -30,6 +31,7 @@ export default function IssueDensityChart() {
       isMounted = false;
     };
   }, []);
+
 
   return (
     <div className="lg:col-span-2 bg-white p-5 rounded-lg border border-gray-200 shadow-sm">

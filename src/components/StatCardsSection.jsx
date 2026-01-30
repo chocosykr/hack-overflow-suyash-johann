@@ -35,5 +35,5 @@ export default function StatCardsSection({ summary }) {
     </section>
   );
 }
-
+ 
 StatCardsSection.propTypes = { summary: PropTypes.object };
