@@ -33,7 +33,7 @@ export default async function StaffDashboard() {
         {/* TAB 2: Issues assigned to me */}
         <TabsContent value="active">
           <StaffIssueList 
-            fetchUrl={`/api/issues?assigneeId=${session.user.id}&status=IN_PROGRESS`} 
+            fetchUrl={`/api/issues?assigneeId=${session.user.id}`} 
             type="active"
           />
         </TabsContent>

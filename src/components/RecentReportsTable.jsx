@@ -5,13 +5,14 @@ import { Building2, MoreHorizontal, ChevronDown, Loader2 } from "lucide-react";
 import StatusBadge from "./StatusBadge";
 import Link from "next/link";
 
-export default function RecentReportsTable() {
-  const [issues, setIssues] = useState([]);
+export default function RecentReportsTable({ issues: initialIssues }) {
+  const [issues, setIssues] = useState(initialIssues || []);
   const [loading, setLoading] = useState(true);
   const [sortOrder, setSortOrder] = useState("newest");
 
   // The Fetch function
   const fetchIssues = useCallback(async () => {
+    if (initialIssues && sortOrder === "newest") return;
     setLoading(true);
     try {
       // Calling the API route we updated earlier
@@ -89,7 +90,7 @@ export default function RecentReportsTable() {
                   <td className="px-5 py-3 font-mono text-xs text-gray-600">
                     {issue.id.substring(0, 8)}...
                   </td>
-                  <td className="px-5 py-3 font-medium text-gray-900">{issue.category || "General"}</td>
+                  <td className="px-5 py-3 font-medium text-gray-900">{issue.category?.name || "General"}</td>
                   <td className="px-5 py-3 text-gray-600 flex items-center gap-2">
                     <Building2 className="w-3.5 h-3.5 text-gray-400" />
                     {issue.hostelName} {issue.blockName}
