@@ -1,22 +1,28 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+generator client {
+  provider = "prisma-client-js"
+  engineType="library"
+}
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 datasource db {
   provider = "postgresql"
 }
 
-generator client {
-  provider   = "prisma-client-js"
-  engineType = "library"
-}
+// ========== ENUMS ==========
 
-// Enums for strict typing (Helps with Dropdowns in UI)
 enum UserRole {
   STUDENT
   ADMIN
   STAFF
+}
+
+enum StaffSpecialization {
+  ELECTRICIAN
+  PLUMBER
+  CARPENTER
+  CLEANER
+  IT_SUPPORT
+  GENERAL_MAINTENANCE
+  SECURITY
 }
 
 enum IssueStatus {
@@ -39,106 +45,409 @@ enum Visibility {
   PRIVATE
 }
 
-enum LostFoundStatus {
-  LOST
-  FOUND
-  CLAIMED
+
+enum ClaimStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
+
+
+
+enum CommentType {
+  DISCUSSION      // General chat (Student <-> Staff)
+  OFFICIAL_UPDATE // Official remark from Staff (visible to all or restricted)
+  INTERNAL_NOTE   // Staff only (Hidden from students)
+}
+
+// Simplified Status
+enum LostFoundStatus {
+  LOST      // "I lost my watch"
+  FOUND     // "I found a watch"
+  RETURNED  // Case closed (Owner got it back)
+}
+
+// ========== MASTER DATA MODELS ==========
+
+model Hostel {
+  id            String         @id @default(cuid())
+  name          String         @unique
+  code          String?        @unique // "BH1", "GH2"
+  address       String?
+  
+  blocks        Block[]
+  users         User[]
+  issues        Issue[]
+  lostItems     LostItem[]
+  announcements Announcement[]
+  
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  
+  @@index([code])
+}
+
+model Block {
+  id            String         @id @default(cuid())
+  name          String         // "Block A", "Wing B"
+  
+  hostelId      String
+  hostel        Hostel         @relation(fields: [hostelId], references: [id], onDelete: Cascade)
+  
+  rooms         Room[]
+  users         User[]
+  issues        Issue[]
+  announcements Announcement[]
+  
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  
+  @@unique([hostelId, name])
+  @@index([hostelId])
+}
+
+model Room {
+  id       String  @id @default(cuid())
+  number   String  // "101", "A-302"
+  floor    Int?
+  capacity Int?    @default(1)
+  
+  blockId  String
+  block    Block   @relation(fields: [blockId], references: [id], onDelete: Cascade)
+  
+  users    User[]
+  issues   Issue[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@unique([blockId, number])
+  @@index([blockId])
+}
+
+model IssueCategory {
+  id             String  @id @default(cuid())
+  name           String  @unique // "Plumbing", "Electrical", "WiFi"
+  description    String?
+  icon           String? // Icon name for UI
+  isActive        Boolean @default(true) // NEW: Soft delete capability
+  
+  // Which specialization handles this category
+  specialization StaffSpecialization?
+  
+  issues         Issue[]
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  @@index([name])
+}
+
+// ========== USER MODEL ==========
 
 model User {
-  id             String    @id @default(cuid())
-  email          String    @unique
-  name           String?
-  password       String    
-  role           UserRole  @default(STUDENT)
+  id             String   @id @default(cuid())
+  email          String   @unique
+  name           String
+  password       String   // Remember to hash with bcrypt!
+  role           UserRole @default(STUDENT)
+  phoneNumber    String?
+  avatar         String?  // Profile picture URL
+  isActive      Boolean   @default(true) // Use this instead of deleting users!
   
-  hostelName     String?   
-  blockName      String?   
-  roomNumber     String?   
-  
-  reportedIssues Issue[]   @relation("Reporter")
-  assignedIssues Issue[]   @relation("Assignee") 
-  comments       Comment[]
-  upvotes        Upvote[]  
-  lostItems      LostItem[]
+  // For STAFF only
+  specialization StaffSpecialization?
 
-  createdAt      DateTime  @default(now())
+  announcements    Announcement[]
+  
+  // Location (for STUDENT only) - SetNull so user isn't deleted if location deleted
+  hostelId       String?
+  hostel         Hostel?  @relation(fields: [hostelId], references: [id], onDelete: SetNull)
+  
+  blockId        String?
+  block          Block?   @relation(fields: [blockId], references: [id], onDelete: SetNull)
+  
+  roomId         String?
+  room           Room?    @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  
+  // Relations
+  reportedIssues          Issue[]                 @relation("Reporter")
+  assignedIssues          Issue[]                 @relation("Assignee")
+  comments                Comment[]
+  upvotes                 Upvote[]
+  lostItems               LostItem[]
+  claims                  LostItemClaim[]
+  statusHistory           IssueStatusHistory[]
+  
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  @@index([email])
+  @@index([role])
+  @@index([hostelId, blockId, roomId])
+  @@index([specialization])
 }
+
+// ========== ISSUE MODELS ==========
 
 model Issue {
-  id           String      @id @default(cuid())
-  title        String
-  description  String
-  category     String      
-  priority     Priority    @default(LOW)
-  status       IssueStatus @default(REPORTED)
-  visibility   Visibility  @default(PUBLIC)
-  mediaUrl     String?     
-
-  hostelName   String
-  blockName    String
-  roomNumber   String
-
-  reporterId   String
-  reporter     User        @relation("Reporter", fields: [reporterId], references: [id])
+  id          String      @id @default(cuid())
+  title       String
+  description String      @db.Text
   
-  assigneeId   String?
-  assignee     User?       @relation("Assignee", fields: [assigneeId], references: [id])
+  categoryId  String
+  category    IssueCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  
+  priority    Priority    @default(LOW)
+  status      IssueStatus @default(REPORTED)
+  visibility  Visibility  @default(PUBLIC)
+  
+  imageUrls   String[]
+  
+  // Location
+  hostelId    String?
+  hostel      Hostel?  @relation(fields: [hostelId], references: [id], onDelete: SetNull)
+  blockId     String?
+  block       Block?   @relation(fields: [blockId], references: [id], onDelete: SetNull)
+  roomId      String?
+  room        Room?    @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  customLocation String? 
 
-  comments     Comment[]
-  upvotes      Upvote[]
-
-  isDuplicate     Boolean @default(false)
-  mergedWithId    String?
-  mergedWith      Issue?  @relation("MergedIssues", fields: [mergedWithId], references: [id])
+  // Reporter: Changed to SetNull to preserve issue history even if student leaves
+  reporterId  String?
+  reporter    User?      @relation("Reporter", fields: [reporterId], references: [id], onDelete: SetNull)
+  
+  assigneeId  String?
+  assignee    User?    @relation("Assignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  
+  comments       Comment[]
+  upvotes        Upvote[]
+  // REMOVED: reactions Reaction[] (Fixes the missing model error)
+  
+  statusHistory  IssueStatusHistory[]
+  
+  isDuplicate    Boolean @default(false)
+  mergedWithId   String?
+  mergedWith     Issue?  @relation("MergedIssues", fields: [mergedWithId], references: [id], onDelete: SetNull)
   duplicateIssues Issue[] @relation("MergedIssues")
-
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  
+  assignedAt  DateTime?
+  resolvedAt  DateTime?
+  closedAt    DateTime?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // OPTIMIZED INDEXES
+  @@index([status, visibility])
+  @@index([hostelId, status]) // NEW: For Dashboard filtering
+  @@index([categoryId])
+  @@index([reporterId])
+  @@index([createdAt]) 
 }
+
+
+model IssueStatusHistory {
+  id          String      @id @default(cuid())
+  
+  issueId     String
+  issue       Issue       @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  
+  fromStatus  IssueStatus?
+  toStatus    IssueStatus
+  
+  // SetNull: Keep history even if user deleted, display as "[Deleted User]"
+  changedById String?
+  changedBy   User?        @relation(fields: [changedById], references: [id], onDelete: SetNull)
+  
+  note        String?
+  
+  createdAt   DateTime    @default(now())
+  
+  @@index([issueId])
+  @@index([createdAt])
+}
+
+
+// ========== INTERACTION MODELS ==========
 
 model Comment {
   id        String   @id @default(cuid())
-  content   String
-  issueId   String
-  issue     Issue    @relation(fields: [issueId], references: [id])
+  content   String   @db.Text
+  
   userId    String
-  user      User     @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // OPTION 1: Link to an Issue
+  issueId   String?  // Made OPTIONAL
+  issue     Issue?   @relation(fields: [issueId], references: [id], onDelete: Cascade)
+
+  // OPTION 2: Link to an Announcement
+  announcementId String? // NEW field
+  announcement   Announcement? @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  
+  lostItemId String?
+  lostItem   LostItem? @relation(fields: [lostItemId], references: [id], onDelete: Cascade)
+  // OPTION 3: Types (Discussion vs Official - from previous advice)
+  type      CommentType @default(DISCUSSION)
+  
+  // Threaded replies work for BOTH now!
+  parentId  String?
+  parent    Comment? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   Comment[] @relation("CommentReplies")
+  
+  upvotes   Upvote[]
+
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([issueId])
+  @@index([announcementId]) // Index this for performance
+  @@index([userId])
 }
+
 
 model Upvote {
-  id      String @id @default(cuid())
-  issueId String
-  issue   Issue  @relation(fields: [issueId], references: [id])
-  userId  String
-  user    User   @relation(fields: [userId], references: [id])
+  id              String        @id @default(cuid())
+  
+  // Who upvoted?
+  userId          String
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // What did they upvote? (Polymorphic relations)
+  issueId         String?
+  issue           Issue?        @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  
+  commentId       String?
+  comment         Comment?      @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  // NEW: Add this to fulfill requirements
+  announcementId  String?
+  announcement    Announcement? @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  
+  createdAt       DateTime      @default(now())
+  
+  // CONSTRAINTS:
+  // These work perfectly in PostgreSQL because NULL values are treated as distinct.
+  // A user can have multiple rows with issueId=NULL (e.g. upvoting different comments),
+  // but only ONE row with issueId="123" and userId="456".
   
   @@unique([issueId, userId])
+  @@unique([commentId, userId])
+  @@unique([announcementId, userId]) // Prevents double-liking an announcement
+  @@index([userId])
 }
+
+
+
+// ========== ANNOUNCEMENT MODELS ==========
 
 model Announcement {
-  id           String    @id @default(cuid())
-  title        String
-  content      String
-  targetHostel String? 
-  targetBlock  String? 
-  targetRole   UserRole? 
+  id             String    @id @default(cuid())
+  title          String
+  content        String    @db.Text
+  
+  // 1. IMPROVEMENT: Add Images (Flyers/Notices)
+  imageUrls      String[]  
+  
+  // 2. IMPROVEMENT: Author (Accountability)
+  // SetNull: If the Warden account is deleted, the announcement stays.
+  authorId       String?
+  author         User?     @relation(fields: [authorId], references: [id], onDelete: SetNull)
 
-  createdAt    DateTime @default(now())
+  // Targeting Logic
+  // if targetHostelId is NULL -> Visible to ALL Hostels
+  targetHostelId String?
+  targetHostel   Hostel?   @relation(fields: [targetHostelId], references: [id], onDelete: SetNull)
+  
+  // if targetBlockId is NULL -> Visible to ALL Blocks in that Hostel
+  targetBlockId  String?
+  targetBlock    Block?    @relation(fields: [targetBlockId], references: [id], onDelete: SetNull)
+  
+  // if targetRole is NULL -> Visible to ALL Roles (Students + Staff)
+  targetRole     UserRole?
+  
+  isPinned       Boolean   @default(false)
+  priority       Priority  @default(MEDIUM)
+  
+  // Interactions
+  comments       Comment[] 
+  upvotes        Upvote[]  // 3. IMPROVEMENT: Inverse relation for Likes
+  
+  // Expiry (Auto-hide old announcements)
+  expiresAt      DateTime?
+  
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([targetHostelId, targetBlockId]) // Fast lookup: "Show me news for Hostel A"
+  @@index([isPinned, priority])            // Fast sorting for the dashboard
 }
+
+
+// ========== LOST & FOUND MODELS ==========
 
 model LostItem {
   id          String          @id @default(cuid())
   title       String
-  description String
+  description String          @db.Text
   status      LostFoundStatus @default(LOST)
-  location    String          
-  date        DateTime        
-  imageUrl    String?
-
-  reporterId  String
-  reporter    User            @relation(fields: [reporterId], references: [id])
   
+  location    String          // "Canteen", "Room 101", "Library"
+  date        DateTime        // When it was lost/found
+  
+  // OPTIMIZATION: Native array instead of Attachment table
+  imageUrls   String[]        
+  
+  // Who posted this?
+  reporterId  String
+  reporter    User      @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  
+  // Where does this belong? (Optional, if it's general campus area)
+  hostelId    String?
+  hostel      Hostel?   @relation(fields: [hostelId], references: [id], onDelete: SetNull)
+  
+  // Interactions
+  claims      LostItemClaim[] // Usually for 'FOUND' items
+  
+  // NEW: Allow comments so people can say "I think I saw this!"
+  // Using the unified Comment model we discussed
+  // (You will need to ensure your Comment model has `lostItemId String?` field)
+  // comments    Comment[]   <-- Add this if you want comments here
+  comments    Comment[]	  
+
   createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status])
+  @@index([hostelId])
+  @@index([date])
 }
+
+model LostItemClaim {
+  id           String      @id @default(cuid())
+  
+  lostItemId   String
+  lostItem     LostItem    @relation(fields: [lostItemId], references: [id], onDelete: Cascade)
+  
+  claimantId   String
+  claimant     User        @relation(fields: [claimantId], references: [id], onDelete: Cascade)
+  
+  // The "Proof"
+  description String?     @db.Text           // Added '?' (Nullable)
+  proofUrls   String[]    @default([])
+  
+  status       ClaimStatus @default(PENDING)
+  
+  reviewNote   String?     // Admin/Finder says: "Proof accepted" or "Details don't match"
+  reviewedAt   DateTime?
+
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([lostItemId])
+  @@index([claimantId])
+}
+
+
