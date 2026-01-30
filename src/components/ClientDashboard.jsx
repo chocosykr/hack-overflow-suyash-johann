@@ -13,8 +13,9 @@ export default function ClientDashboard({ userId }) {
     .then(data => {
       // Check if data.issues exists (from your paginated API)
       // otherwise fallback to data (if it's a plain array)
+
       const issueList = data.issues || data; 
-      
+      console.log(issueList)
       if (Array.isArray(issueList)) {
         setIssues(issueList);
       } else {

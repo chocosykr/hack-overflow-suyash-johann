@@ -3,17 +3,14 @@
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "../components/ui/card"
 import { Badge } from "../components/ui/badge"
 import { Button } from "../components/ui/button"
-import { ThumbsUp, MapPin } from "lucide-react"
-import { ToggleUpvote } from "../app/actions/ToggleUpvote" // Import the action above
+import { ThumbsUp, MapPin, Building2 } from "lucide-react" // Added Building2 icon
+import { ToggleUpvote } from "../app/actions/ToggleUpvote"
 import { useOptimistic, startTransition } from "react"
 
-
 export default function IssueCard({ issue, currentUserId }) {
-  // Check if the current user has already upvoted based on the data passed down
   const initialHasUpvoted = (issue.upvotes?.length || 0) > 0;
   const initialCount = issue._count?.upvotes || 0;
 
-  // Optimistic UI state
   const [optimisticState, setOptimisticState] = useOptimistic(
     { hasUpvoted: initialHasUpvoted, count: initialCount },
     (state, newStatus) => ({
@@ -23,13 +20,14 @@ export default function IssueCard({ issue, currentUserId }) {
   )
 
   const handleUpvote = async () => {
-    // 1. Update UI instantly (before DB responds)
     startTransition(() => {
       setOptimisticState(!optimisticState.hasUpvoted)
     })
-    // 2. Call Server Action
     await ToggleUpvote(issue.id)
   }
+
+  // Handle category display (whether it's an object or string)
+  const categoryName = typeof issue.category === 'object' ? issue.category?.name : issue.category;
 
   return (
     <Card className="mb-4 hover:shadow-md transition-shadow">
@@ -39,7 +37,7 @@ export default function IssueCard({ issue, currentUserId }) {
             <Badge variant={issue.status === 'RESOLVED' ? "default" : "secondary"}>
               {issue.status}
             </Badge>
-            <span className="text-xs text-muted-foreground">{issue.category}</span>
+            <span className="text-xs text-muted-foreground">{categoryName}</span>
           </div>
           <CardTitle className="text-lg">{issue.title}</CardTitle>
         </div>
@@ -47,9 +45,26 @@ export default function IssueCard({ issue, currentUserId }) {
 
       <CardContent>
         <p className="text-sm text-gray-600 mb-4">{issue.description}</p>
-        <div className="flex items-center text-xs text-muted-foreground">
-          <MapPin className="w-3 h-3 mr-1" />
-          {issue.blockName} • Room {issue.roomNumber}
+        
+        {/* UPDATED LOCATION SECTION */}
+        <div className="flex flex-wrap gap-3 text-xs text-muted-foreground bg-slate-50 p-2 rounded-md">
+           {/* Hostel Name */}
+           {issue.hostel?.name && (
+            <div className="flex items-center">
+              <Building2 className="w-3 h-3 mr-1" />
+              <span className="font-medium">{issue.hostel.name}</span>
+            </div>
+           )}
+
+           {/* Block & Room */}
+           {(issue.block?.name || issue.room?.number) && (
+            <div className="flex items-center border-l pl-3 border-gray-200">
+              <MapPin className="w-3 h-3 mr-1" />
+              {issue.block?.name} 
+              {issue.block?.name && issue.room?.number && " • "}
+              {issue.room?.number && `Room ${issue.room.number}`}
+            </div>
+           )}
         </div>
       </CardContent>
 
@@ -58,7 +73,6 @@ export default function IssueCard({ issue, currentUserId }) {
           {new Date(issue.createdAt).toLocaleDateString('en-IN')}
         </span>
         
-        {/* The "Me Too" Button */}
         <Button 
           variant={optimisticState.hasUpvoted ? "default" : "outline"} 
           size="sm" 

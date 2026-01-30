@@ -1,11 +1,13 @@
-// app/actions.ts
 'use server'
 
 import { prisma } from '../../lib/prisma'
 import { revalidatePath } from 'next/cache'
-import { auth } from '../auth' // Your auth path
+import { auth } from '../auth' 
 import { redirect } from 'next/navigation'
 
+// Renamed to match your import in the form component
+// If your import is 'createIssue', keep this name. 
+// If it is 'createIssueAction', change it here.
 export async function createIssue(formData) {
   const session = await auth()
   if (!session?.user) throw new Error("Unauthorized")
@@ -13,42 +15,54 @@ export async function createIssue(formData) {
   // 1. EXTRACT DATA
   const title = formData.get('title') 
   const description = formData.get('description') 
-  const category = formData.get('category') 
+  const categoryId = formData.get('category') 
   const priority = formData.get('priority') 
-  const visibility = formData.get('visibility')  // "PUBLIC" or "PRIVATE"
-  const mediaUrl = formData.get('mediaUrl')  // URL from your upload service
+  const visibility = formData.get('visibility') 
+  const mediaUrl = formData.get('mediaUrl') 
 
-  // 2. AUTOMATIC TAGGING (The "Smart" Feature)
-  // We fetch the user's location from their profile, NOT the form.
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id }
-  })
+  // 2. LOCATION LOGIC (The Fix)
+  // Priority A: Check if the form sent a manual location (Staff Override)
+  // Priority B: Check if the user has a location in their profile (Student Auto-tag)
+  let hostelId = formData.get('hostelId') 
+  let blockId = formData.get('blockId')
+  // Room is usually optional for staff or derived from profile
+  let roomId = formData.get('roomId') 
 
-  if (!user?.hostelName || !user?.blockName) {
-    throw new Error("Profile incomplete. Please update hostel details.")
+  // If not in form, grab from profile
+  if (!hostelId) hostelId = session.user.hostelId
+  if (!blockId) blockId = session.user.blockId
+  if (!roomId) roomId = session.user.roomId
+
+  // 3. FINAL VALIDATION
+  if (!hostelId || !blockId) {
+    throw new Error("Location is required. Please update your profile or select a location.")
   }
 
-  // 3. DATABASE INSERT
+  // 4. DATABASE INSERT
   await prisma.issue.create({
     data: {
       title,
       description,
-      category,
-      priority: priority, // Cast to Enum
-      visibility: visibility, // Cast to Enum
-      mediaUrl: mediaUrl || null,
+      priority: priority || 'LOW', 
+      visibility: visibility || 'PUBLIC',
+      status: 'REPORTED',
       
-      // Automatic Tagging
-      hostelName: user.hostelName,
-      blockName: user.blockName,
-      roomNumber: user.roomNumber || "N/A",
+      // Handle the array of strings for images
+      imageUrls: mediaUrl ? [mediaUrl] : [],
       
-      reporterId: session.user.id,
-      status: 'REPORTED'
+      // RELATIONS
+      category: { connect: { id: categoryId } },
+      reporter: { connect: { id: session.user.id } },
+      
+      hostel: { connect: { id: hostelId } },
+      block:  { connect: { id: blockId } },
+      // Only connect room if we have a valid ID (it might be null for staff)
+      room:   roomId ? { connect: { id: roomId } } : undefined,
     }
   })
 
   revalidatePath('/homepage/student')
-  // CHANGE: Return success instead of redirecting
+  revalidatePath('/homepage/staff')
+  
   return { success: true }
 }
