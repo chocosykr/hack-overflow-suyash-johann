@@ -7,36 +7,43 @@ import { Button } from "./ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "./ui/dialog"
 import { Textarea } from "./ui/textarea"
 import { Label } from "./ui/label"
-import { submitClaim,markAsFound } from '../app/actions/lostfound'
-import { MapPin, Calendar, HelpCircle,CheckCircle } from 'lucide-react'
-
+import { submitClaim, markAsFound } from '../app/actions/lostfound'
+import { MapPin, Calendar, HelpCircle, CheckCircle } from 'lucide-react'
+import MediaGallery from './MediaGallery' // Import the gallery component
 
 export default function LostFoundCard({ item, currentUserId, canClaim }) {
   const [isClaiming, setIsClaiming] = useState(false)
-  const [error, setError] = useState(""); // Add this state
+  const [error, setError] = useState("")
 
-  // Prevent users from claiming their own uploads
   const isMyUpload = item.reporterId === currentUserId
   const iHaveClaimed = item.claims && item.claims.length > 0
+  
+  // FIX: Handle the array from Prisma (imageUrls) instead of singular (imageUrl)
+  const coverImage = item.imageUrls?.[0] || null
 
-
-  // Handler for the form
   async function handleClaim(formData) {
-    setError(""); // Clear previous errors
+    setError(""); 
     const result = await submitClaim(formData);
     
     if (result?.error) {
       setError(result.error);
     } else {
-      setIsClaiming(false); // Close dialog on success
+      setIsClaiming(false); 
     }
   }
+
   return (
-    <Card className="flex flex-col sm:flex-row overflow-hidden">
-      {/* Image Section */}
-      <div className="sm:w-32 bg-gray-100 flex items-center justify-center shrink-0">
-        {item.imageUrl ? (
-          <img src={item.imageUrl} alt={item.title} className="h-32 w-full object-cover" />
+    <Card className="flex flex-col sm:flex-row overflow-hidden hover:shadow-md transition-shadow">
+      
+      {/* 1. THUMBNAIL SECTION (Left Side) */}
+      {/* Only show this sidebar if there is an image, otherwise the card looks cleaner without the grey box */}
+      <div className="sm:w-32 bg-gray-100 flex items-center justify-center shrink-0 min-h-[120px]">
+        {coverImage ? (
+          <img 
+            src={coverImage} 
+            alt={item.title} 
+            className="h-full w-full object-cover" 
+          />
         ) : (
           <HelpCircle className="h-10 w-10 text-gray-300" />
         )}
@@ -56,17 +63,26 @@ export default function LostFoundCard({ item, currentUserId, canClaim }) {
         </CardHeader>
 
         <CardContent className="text-sm pb-2 flex-1">
-          <p className="text-gray-600 mb-2 line-clamp-2">{item.description}</p>
-          <div className="flex gap-4 text-xs text-gray-500">
+          <p className="text-gray-600 mb-3 line-clamp-2">{item.description}</p>
+          
+          {/* 2. FULL GALLERY (Inside Content) */}
+          {/* This allows users to see all images and zoom in */}
+          {item.imageUrls?.length > 0 && (
+            <div className="mb-3">
+              <MediaGallery imageUrls={item.imageUrls} />
+            </div>
+          )}
+
+          <div className="flex gap-4 text-xs text-gray-500 mt-auto">
             <span className="flex items-center gap-1">
               <MapPin className="w-3 h-3" /> {item.location}
             </span>
             <span className="flex items-center gap-1">
               <Calendar className="w-3 h-3" /> {new Date(item.date).toLocaleDateString('en-GB', {
-  day: 'numeric',
-  month: 'short', 
-  year: 'numeric'
-})}
+                day: 'numeric',
+                month: 'short', 
+                year: 'numeric'
+              })}
             </span>
           </div>
         </CardContent>
@@ -80,7 +96,7 @@ export default function LostFoundCard({ item, currentUserId, canClaim }) {
           ) : (
             <Dialog open={isClaiming} onOpenChange={(open) => {
               setIsClaiming(open);
-              if (!open) setError(""); // Reset error when closing
+              if (!open) setError(""); 
             }}>
               <DialogTrigger asChild>
                 <Button size="sm" className="w-full sm:w-auto">
@@ -92,7 +108,6 @@ export default function LostFoundCard({ item, currentUserId, canClaim }) {
                   <DialogTitle>Claim Item: {item.title}</DialogTitle>
                 </DialogHeader>
                 
-                {/* Error Message Display */}
                 {error && (
                   <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md border border-destructive/20">
                     {error}
@@ -106,7 +121,7 @@ export default function LostFoundCard({ item, currentUserId, canClaim }) {
                       <Label>Proof of Ownership</Label>
                       <Textarea 
                         name="description" 
-                        placeholder="Describe unique details..."
+                        placeholder="Describe unique details (e.g. 'scratch on the back', 'wallpaper is a dog')..."
                         required 
                       />
                     </div>
@@ -120,10 +135,9 @@ export default function LostFoundCard({ item, currentUserId, canClaim }) {
           )
         )}
           
-          {/* SCENARIO B & C: My Items */}
+          {/* My Items Logic */}
           {isMyUpload && (
              item.status === 'LOST' ? (
-               // I lost this, but now I found it -> Show "Mark as Found" button
                <form action={markAsFound}>
                  <input type="hidden" name="itemId" value={item.id} />
                  <Button 
@@ -136,7 +150,6 @@ export default function LostFoundCard({ item, currentUserId, canClaim }) {
                  </Button>
                </form>
              ) : (
-               // I found this, waiting for owner -> Show Status
                <span className="text-xs text-gray-400 italic">Reported by you</span>
              )
           )}
