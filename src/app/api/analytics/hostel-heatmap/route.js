@@ -1,4 +1,3 @@
-// /app/api/analytics/hostel-heatmap/route.js
 import { prisma } from "../../../../lib/prisma";
 
 const OPEN_STATUSES = ["REPORTED", "ASSIGNED", "IN_PROGRESS"];
@@ -7,9 +6,8 @@ const HIGH_PRIORITY = ["HIGH", "EMERGENCY"];
 export async function GET() {
   try {
     const issues = await prisma.issue.findMany({
-      where: {
-        visibility: "PUBLIC",
-      },
+      // REMOVED `where: { visibility: "PUBLIC" }`
+      // Analytics should typically show ALL data, regardless of visibility.
       select: { 
         priority: true,
         status: true,
@@ -34,7 +32,8 @@ export async function GET() {
       map[key] ??= {
         hostel: hostelName,
         block: blockName,
-        openCount: 0,
+        totalCount: 0, // NEW: Tracks everything (Closed + Resolved + Open)
+        openCount: 0,  // Tracks backlog (Reported + Assigned + In Progress)
         highPriorityCount: 0,
         resolutionSum: 0,
         resolvedCount: 0,
@@ -42,6 +41,10 @@ export async function GET() {
 
       const cell = map[key];
 
+      // 1. Always increment Total Count
+      cell.totalCount++;
+
+      // 2. Count Open / Pending Issues (Includes IN_PROGRESS)
       if (OPEN_STATUSES.includes(issue.status)) {
         cell.openCount++;
 
@@ -50,18 +53,26 @@ export async function GET() {
         }
       }
 
+      // 3. Calculation for Resolution Time
       if (issue.status === "RESOLVED") {
         cell.resolvedCount++;
-        cell.resolutionSum +=
-          (issue.updatedAt - issue.createdAt) / (1000 * 60 * 60);
+        // Calculate hours difference
+        const created = new Date(issue.createdAt);
+        const updated = new Date(issue.updatedAt);
+        const diffHours = (updated - created) / (1000 * 60 * 60);
+        
+        // Safety check to ensure valid numbers
+        if (!isNaN(diffHours)) {
+            cell.resolutionSum += diffHours;
+        }
       }
     }
 
     const data = Object.values(map).map(c => ({
       hostel: c.hostel,
       block: c.block,
-      count: c.openCount,
-      pendingCount: c.openCount,
+      count: c.totalCount, // FIXED: Now shows Total volume
+      pendingCount: c.openCount, // Shows specific backlog
       highPriorityCount: c.highPriorityCount,
       avgResolutionHours:
         c.resolvedCount > 0
