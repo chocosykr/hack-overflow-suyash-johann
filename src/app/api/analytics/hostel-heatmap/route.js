@@ -63,10 +63,6 @@ export async function GET(request) {
 
       map[key] ??= { hostel: hName, block: bName, count: 0, highPriorityCount: 0 };
 
-      // 1. Always increment Total Count
-      cell.totalCount++;
-
-      // 2. Count Open / Pending Issues (Includes IN_PROGRESS)
       if (OPEN_STATUSES.includes(issue.status)) {
         map[key].count++;
         if (HIGH_PRIORITY.includes(issue.priority)) {
