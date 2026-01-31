@@ -35,7 +35,7 @@ export default function StatCardsSection({ summary }) {
         />
         <StatCard
           title="Avg. Resolution"
-          value={summary?.avgResolution ? `${summary.avgResolution}h` : "--"}
+          value={summary?.avgResolution ? `${summary.avgResolution}` : "--"}
           subtext="-4h"
           Icon={Clock}
           trend="down"
@@ -49,7 +49,7 @@ export default function StatCardsSection({ summary }) {
         />
         <StatCard
           title="Total Occupancy"
-          value={summary?.occupancy ? `${summary.occupancy}%` : "0%"}
+          value={summary?.occupancy ? `${summary.occupancy}` : "0%"}
           subtext="+2%"
           Icon={Users}
           trend="up"
