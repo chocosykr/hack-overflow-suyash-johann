@@ -2,16 +2,8 @@
 
 import React from "react";
 import PropTypes from "prop-types";
+import { Map, Info, ChevronRight, Activity } from "lucide-react";
 
-/**
- * Layout:
- * | Heatmap (50%) | Drilldown Panel (50%) |
- *
- * Props:
- * - since, until (optional)
- * - onCellClick({ hostel, block })
- * - rightPane (ReactNode) -> drilldown results UI
- */
 export default function HostelHeatmap({ since, until, onCellClick, rightPane }) {
   const [data, setData] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
@@ -33,7 +25,6 @@ export default function HostelHeatmap({ since, until, onCellClick, rightPane }) 
   }, [since, until]);
 
   const { hostels, blocks, grid, maxCount } = React.useMemo(() => {
-    // 1. Extract the name strings if they are objects, otherwise keep as is
     const hostels = [...new Set(data.map(d =>
       typeof d.hostel === 'object' ? d.hostel.name : d.hostel
     ))].sort();
@@ -44,10 +35,8 @@ export default function HostelHeatmap({ since, until, onCellClick, rightPane }) 
 
     const map = {};
     data.forEach(d => {
-      // Normalize h and b to strings for the map keys
       const h = typeof d.hostel === 'object' ? d.hostel.name : d.hostel;
       const b = typeof d.block === 'object' ? d.block.name : d.block;
-
       map[h] ??= {};
       map[h][b] = d;
     });
@@ -59,78 +48,109 @@ export default function HostelHeatmap({ since, until, onCellClick, rightPane }) 
     );
 
     const maxCount = Math.max(1, ...data.map(d => d.count ?? 0));
-
     return { hostels, blocks, grid, maxCount };
   }, [data]);
 
   function cellColor(count) {
+    if (count === 0) return '#f9fafb';
     const t = Math.min(1, count / maxCount);
-    return `rgba(220,38,38,${0.15 + t * 0.75})`;
+    // Using a sophisticated Indigo-to-Rose scale for high-end feel
+    return `rgba(79, 70, 229, ${0.1 + t * 0.9})`;
   }
 
-  if (loading) return <div className="bg-white p-4 rounded border">Loading heatmap…</div>;
-  if (error) return <div className="bg-white p-4 rounded border text-red-600">{error}</div>;
+  if (loading) return (
+    <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm flex flex-col items-center justify-center gap-3">
+      <div className="w-6 h-6 border-2 border-indigo-600/20 border-t-indigo-600 rounded-full animate-spin" />
+      <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Generating Heatmap...</span>
+    </div>
+  );
+
+  if (error) return (
+    <div className="bg-white p-8 rounded-3xl border border-rose-100 text-rose-600 text-[10px] font-black uppercase tracking-widest text-center">
+      {error}
+    </div>
+  );
 
   return (
-    <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* LEFT: HEATMAP */}
-      <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm overflow-x-auto">
-        <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide mb-3">
-          Hostel / Block Heatmap
-        </h3>
+      <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-indigo-50 rounded-xl text-indigo-600">
+              <Map className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">Hostel Density</h3>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tight font-mono">Intensity by Block</p>
+            </div>
+          </div>
+          <Info className="w-4 h-4 text-gray-300" />
+        </div>
 
-        <table className="w-full table-fixed">
-          <thead>
-            <tr>
-              <th className="px-2 py-2 text-xs text-left text-gray-600">Hostel</th>
-              {blocks.map(b => (
-                <th key={b} className="px-2 py-2 text-xs text-center text-gray-600">
-                  {b}
-                </th>
-              ))}
-            </tr>
-          </thead>
-
-          <tbody>
-            {hostels.map((h, i) => (
-              <tr key={h}>
-                <td className="px-2 py-2 text-sm font-medium text-gray-800 whitespace-nowrap">
-                  {h}
-                </td>
-                {grid[i].map(cell => (
-                  <td key={cell.block} className="px-2 py-2">
-                    <button
-                      className="w-full p-3 rounded-md text-sm font-semibold border transition hover:scale-[1.02]"
-                      style={{ backgroundColor: cellColor(cell.count) }}
-                      onClick={() => onCellClick?.({ hostel: cell.hostel, block: cell.block })}
-                      title={`${cell.count} issues`}
-                    >
-                      {cell.count}
-                    </button>
-                  </td>
+        <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-100">
+          <table className="w-full border-separate border-spacing-2">
+            <thead>
+              <tr>
+                <th className="p-1"></th>
+                {blocks.map(b => (
+                  <th key={b} className="p-1 text-[10px] font-black text-gray-400 uppercase tracking-tighter">
+                    {b}
+                  </th>
                 ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {hostels.map((h, i) => (
+                <tr key={h}>
+                  <td className="pr-4 py-2 text-xs font-black text-gray-700 uppercase tracking-tight whitespace-nowrap">
+                    {h}
+                  </td>
+                  {grid[i].map(cell => (
+                    <td key={cell.block} className="p-0">
+                      <button
+                        className={`w-full aspect-square md:aspect-auto md:h-12 rounded-xl text-xs font-black transition-all hover:scale-105 hover:shadow-lg active:scale-95 flex items-center justify-center ${cell.count > 0 ? 'text-white' : 'text-gray-300 border border-dashed border-gray-100'
+                          }`}
+                        style={{ backgroundColor: cellColor(cell.count) }}
+                        onClick={() => onCellClick?.({ hostel: cell.hostel, block: cell.block })}
+                      >
+                        {cell.count > 0 ? cell.count : ''}
+                      </button>
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* RIGHT: DRILLDOWN PANEL */}
-      <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm min-h-75 max-h-75 overflow-y-auto">
-        {rightPane ?? (
-          <div className="h-full flex items-center justify-center text-sm text-gray-500">
-            Select a block to view issues
-          </div>
-        )}
+      <div className="bg-white rounded-3xl border border-gray-100 shadow-sm flex flex-col min-h-100 overflow-hidden">
+        <div className="px-6 py-4 bg-gray-50/50 border-b border-gray-100 flex items-center gap-2">
+          <Activity className="w-4 h-4 text-gray-400" />
+          <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Detail Inspection</span>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+          {rightPane ?? (
+            <div className="h-full flex flex-col items-center justify-center text-center p-8">
+              <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mb-3">
+                <ChevronRight className="w-5 h-5 text-gray-300" />
+              </div>
+              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest max-w-37.5">
+                Select a heatmap cell to drill down
+              </p>
+            </div>
+          )}
+        </div>
       </div>
     </section>
   );
 }
- 
+
 HostelHeatmap.propTypes = {
   since: PropTypes.string,
   until: PropTypes.string,
   onCellClick: PropTypes.func,
   rightPane: PropTypes.node,
 };
- 
