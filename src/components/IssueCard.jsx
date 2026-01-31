@@ -10,6 +10,7 @@ import { closeIssue } from "../app/actions/issueActions"
 import { useRouter } from "next/navigation"
 import MediaGallery from "./MediaGallery"
 import CommentSection from "./CommentSection"
+import {priorityStyles} from "../lib/utils"
 
 export default function IssueCard({ issue, currentUserId }) {
   const initialHasUpvoted = (issue.upvotes?.length || 0) > 0;
@@ -78,6 +79,13 @@ export default function IssueCard({ issue, currentUserId }) {
                <Badge variant={displayStatus === 'RESOLVED' ? "default" : "secondary"}>
                  {displayStatus}
                </Badge>
+            )}
+
+            {/* 2. NEW PRIORITY BADGE (Insert Here) */}
+            {issue.priority && (
+              <Badge variant="outline" className={`text-[10px] h-5 ${priorityStyles[issue.priority]}`}>
+                {issue.priority}
+              </Badge>
             )}
 
             <span className="text-xs text-muted-foreground">{categoryName}</span>
