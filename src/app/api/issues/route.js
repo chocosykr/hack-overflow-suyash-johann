@@ -16,6 +16,7 @@ export async function GET(request) {
     const assigneeId = searchParams.get("assigneeId");
     const specialization = searchParams.get("specialization");
     const priority =searchParams.get("priority");
+    const category = searchParams.get("category");
     
     // 1. NEW PARAM: Allow filtering by Reporter (for "My Issues")
     const reporterId = searchParams.get("reporterId"); 
@@ -41,10 +42,14 @@ export async function GET(request) {
       ...(block && { block: { name: block } }),
       ...(assigneeId && { assigneeId }),
       ...(reporterId && { reporterId }), // Add to query
-      ...(priority && { priority }),
+      
       
       ...(specialization && { 
          category: { specialization: specialization } 
+      }),
+
+      ...(category && category !== "All Categories" && { 
+         category: { name: category } 
       }),
 
       ...(search && {
@@ -72,8 +77,25 @@ export async function GET(request) {
     }
 
     // ---------------------------
+    let orderBy;
 
-    const orderBy = sort === "oldest" ? { createdAt: "asc" } : { createdAt: "desc" };
+    if (sort === 'priority') {
+      // 1. PRIORITY SORT (with Date as Secondary)
+      // Emergency -> High -> Medium -> Low. Within each, Newest first.
+      orderBy = [
+        { priority: "desc" }, 
+        { createdAt: "desc" }
+      ];
+    } else if (sort === 'oldest') {
+      // 2. OLDEST FIRST
+      orderBy = { createdAt: "asc" };
+    } else if (sort === 'most_upvoted') {
+       // 3. MOST UPVOTED
+       orderBy = { upvotes: { _count: "desc" } };
+    } else {
+      // 4. DEFAULT: NEWEST FIRST (Pure Date Sort)
+      orderBy = { createdAt: "desc" };
+    }
 
     const include = {
       _count: { select: { upvotes: true } },
