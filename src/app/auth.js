@@ -33,7 +33,8 @@ return {
     blockId: user.blockId,
     roomId: user.roomId,
     // Optional: include the avatar if you plan to use it in the student profile
-    avatar: user.avatar 
+    avatar: user.avatar,
+    specialization: user.specialization 
   }
 }
   }

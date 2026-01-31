@@ -1,57 +1,85 @@
 'use client'
 
 import { useState } from 'react'
-import { reportLostItem } from '../../../actions/lostfound' 
+import { reportLostItem } from '../../../../app/actions/lostfound' // Check path validity
 import { Button } from '../../../../components/ui/button'
 import { Input } from '../../../../components/ui/input'
 import { Textarea } from '../../../../components/ui/textarea'
 import { Label } from '../../../../components/ui/label'
-// Removed Select imports as they are no longer needed
 import { RadioGroup, RadioGroupItem } from "../../../../components/ui/radio-group"
-import { Loader2, UploadCloud, Search, MapPin, Calendar } from 'lucide-react'
+import { Loader2, UploadCloud, Search, MapPin, Calendar, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-
-// NOTE: This is a Mock function. Replace with real upload logic for production.
-async function uploadImageToCloud(file){
-  await new Promise(resolve => setTimeout(resolve, 1000))
-  return `https://placehold.co/600x400?text=${encodeURIComponent(file.name)}`
-}
 
 export default function ReportLostFoundPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [reportType, setReportType] = useState('LOST')
   const [previewUrl, setPreviewUrl] = useState(null)
+  const [uploadStatus, setUploadStatus] = useState("") // Feedback text
   const router = useRouter()
+
+  // --- CLOUDINARY CONFIG ---
+  // TODO: Replace with your actual Cloudinary values
+  const CLOUD_NAME = "db9mwuj3e" 
+  const UPLOAD_PRESET = "hack_overflow_hostel" 
 
   async function handleSubmit(event) {
     event.preventDefault()
     setIsSubmitting(true)
+    setUploadStatus("")
     
-    // Save reference to form to reset it later
     const formElement = event.currentTarget
     const formData = new FormData(formElement)
     
-    try {
-      // Handle File Upload
-      const fileInput = (formElement.elements.namedItem('image'))
-      if (fileInput.files && fileInput.files[0]) {
-        const url = await uploadImageToCloud(fileInput.files[0])
-        formData.append('imageUrl', url)
-      }
+    // 1. HANDLE IMAGE UPLOAD
+    const fileInput = formElement.querySelector('input[name="image"]')
+    const file = fileInput?.files?.[0]
 
-      // 1. Capture the result from the server action
+    if (file) {
+      setUploadStatus("Uploading image...")
+      try {
+        const uploadData = new FormData()
+        uploadData.append('file', file)
+        uploadData.append('upload_preset', UPLOAD_PRESET)
+
+        const response = await fetch(
+          `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
+          { method: 'POST', body: uploadData }
+        )
+
+        if (!response.ok) {
+            const err = await response.json()
+            throw new Error(err.error?.message || "Upload failed")
+        }
+
+        const data = await response.json()
+        
+        // Append the real URL to the form data
+        // Note: The server action expects 'imageUrl' based on your previous code
+        formData.append('imageUrl', data.secure_url) 
+        formData.delete('image')
+      } catch (error) {
+        console.error("Cloudinary Error:", error)
+        alert(`Image upload failed: ${error.message}`)
+        setIsSubmitting(false)
+        setUploadStatus("")
+        return // Stop submission
+      }
+    }
+
+    // 2. SUBMIT TO SERVER
+    try {
+      setUploadStatus("Submitting report...")
       const result = await reportLostItem(formData)
 
-      // 2. Handle the success case
       if (result?.success) {
         alert("Report submitted successfully!")
-        formElement.reset() // Clears the form fields
-        setPreviewUrl(null) // Clears your image preview state
-        // router.push('/homepage/student') // Optional: Redirect the user
-        router.push('/homepage/search')
+        formElement.reset() 
+        setPreviewUrl(null)
+        setUploadStatus("")
+        router.push('/homepage/search') 
+        router.refresh()
       } else {
-        // Handle case where server returns { error: "..." } instead of throwing
         alert(result?.error || "Failed to submit report")
       }
       
@@ -59,8 +87,8 @@ export default function ReportLostFoundPage() {
       console.error(error)
       alert("An unexpected error occurred.")
     } finally {
-      // 3. Always turn off the loading state
       setIsSubmitting(false)
+      setUploadStatus("")
     }
   }
 
@@ -115,8 +143,6 @@ export default function ReportLostFoundPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-             {/* CATEGORY REMOVED HERE */}
-
             <div className="space-y-2">
               <Label htmlFor="date">Date {reportType === 'LOST' ? 'Lost' : 'Found'}</Label>
               <div className="relative">
@@ -159,14 +185,30 @@ export default function ReportLostFoundPage() {
               type="file" 
               name="image" 
               accept="image/*"
-              className="absolute inset-0 opacity-0 cursor-pointer"
+              className="absolute inset-0 opacity-0 cursor-pointer z-10"
               onChange={(e) => {
                 const file = e.target.files?.[0]
                 if (file) setPreviewUrl(URL.createObjectURL(file))
+                else setPreviewUrl(null)
               }}
             />
             {previewUrl ? (
-              <img src={previewUrl} alt="Preview" className="h-32 object-contain rounded shadow-sm" />
+              <div className="relative z-20">
+                <img src={previewUrl} alt="Preview" className="h-32 object-contain rounded shadow-sm" />
+                <button 
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    setPreviewUrl(null)
+                    // Reset file input
+                    const input = document.querySelector('input[name="image"]')
+                    if(input) input.value = ""
+                  }}
+                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 shadow-md"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             ) : (
               <>
                 <UploadCloud className="w-8 h-8 mb-2 text-gray-400" />
@@ -180,7 +222,7 @@ export default function ReportLostFoundPage() {
           {isSubmitting ? (
             <>
               <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              Submitting...
+              {uploadStatus || "Submitting..."}
             </>
           ) : (
             reportType === 'LOST' ? "Report Lost Item" : "Report Found Item"

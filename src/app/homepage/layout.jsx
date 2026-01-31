@@ -1,10 +1,17 @@
 import DashboardNav from '../../components/DashboardNav'
-
-export default function Layout({ children }) {
+import { auth } from '../auth' // Your auth helper
+export default async function Layout({ children }) {
+  const session = await auth()
+  
+  // Optional: protect the route if needed
+  if (!session?.user) redirect('/login')
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Navigation Component (Handles Sidebar & Bottom Bar) */}
-      <DashboardNav />
+      <DashboardNav
+      role={session.user.role} 
+      userId={session.user.id}
+      />
 
       {/* Main Content Area */}
       <main className="md:pl-64 pb-20 md:pb-0">
