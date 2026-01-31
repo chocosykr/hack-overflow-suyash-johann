@@ -2,105 +2,145 @@ import { NextResponse } from "next/server";
 import { prisma } from "../../../lib/prisma";
 import { auth } from "../../auth";
 
+function clean(val) {
+  if (!val) return null;
+  return String(val).split(/[?&]/)[0].trim();
+}
+
 export async function GET(request) {
   try {
     const session = await auth();
-    const userId = session?.user?.id || null;
-    const userRole = session?.user?.role || "STUDENT";
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const userId = session.user.id;
+    const userRole = session.user.role ?? "STUDENT";
 
     const { searchParams } = new URL(request.url);
-    const hostel = searchParams.get("hostel");
-    const block = searchParams.get("block");
-    const status = searchParams.get("status");
-    const search = searchParams.get("search");
-    const assigneeId = searchParams.get("assigneeId");
-    const specialization = searchParams.get("specialization");
-    const priority =searchParams.get("priority");
-    
-    // 1. NEW PARAM: Allow filtering by Reporter (for "My Issues")
-    const reporterId = searchParams.get("reporterId"); 
-    
-    const sort = searchParams.get("sort") || "newest";
-    const page = Math.max(1, Number(searchParams.get("page") || 1));
-    const limit = Math.min(100, Math.max(5, Number(searchParams.get("limit") || 15)));
+
+    const hostel = clean(searchParams.get("hostel"));
+    const block = clean(searchParams.get("block"));
+    const status = clean(searchParams.get("status"));
+    const search = clean(searchParams.get("search"));
+    const assigneeId = clean(searchParams.get("assigneeId"));
+    const reporterId = clean(searchParams.get("reporterId"));
+    const specialization = clean(searchParams.get("specialization"));
+    const priority = clean(searchParams.get("priority"));
+    const visibility = clean(searchParams.get("visibility"));
+
+    const sort = clean(searchParams.get("sort")) || "newest";
+    const page = Math.max(1, Number(clean(searchParams.get("page")) || 1));
+    const limit = Math.min(100, Math.max(5, Number(clean(searchParams.get("limit")) || 15)));
     const skip = (page - 1) * limit;
 
-    // 2. LOGIC: When should we show duplicates/closed issues?
-    // If we are searching, looking at "My Issues", or looking at "Assigned to Me", show everything.
-    // Otherwise (Public Feed), hide duplicates and closed issues.
-    const isSpecificView = reporterId || assigneeId || search || status === "ALL";
+    const unresolvedOnly = clean(searchParams.get("unresolved")) !== "false";
+    const isSpecificView = Boolean(reporterId || assigneeId || search || status === "ALL");
 
-    // Default "Unresolved" logic: Only apply if we are NOT in a specific view
-    // (e.g. In "My Issues", I want to see my Closed/Duplicate issues too)
-    const unresolvedOnly = searchParams.get("unresolved") !== "false";
+    const where = {};
 
-    const where = {
-      // REMOVED "isDuplicate: false" from here. We handle it conditionally below.
-      
-      ...(hostel && { hostel: { name: hostel } }), 
-      ...(block && { block: { name: block } }),
-      ...(assigneeId && { assigneeId }),
-      ...(reporterId && { reporterId }), // Add to query
-      ...(priority && { priority }),
-      
-      ...(specialization && { 
-         category: { specialization: specialization } 
-      }),
+    /* ---------- LOCATION FILTERS (FIXED) ---------- */
+    if (hostel) {
+      where.hostel = {
+        name: { contains: hostel, mode: "insensitive" },
+      };
+    }
 
-      ...(search && {
-        OR: [
-          { title: { contains: search, mode: "insensitive" } },
-          { hostel: { name: { contains: search, mode: "insensitive" } } }, 
-        ],
-      }),
-    };
+    if (block) {
+      where.block = {
+        name: { contains: block, mode: "insensitive" },
+      };
+    }
 
-    // --- CONDITIONAL FILTERS ---
+    /* ---------- OWNERSHIP ---------- */
+    if (assigneeId) where.assigneeId = assigneeId;
+    if (reporterId) where.reporterId = reporterId;
 
-    // A. Status Filter
+    /* ---------- METADATA ---------- */
+    if (priority) where.priority = priority;
+    if (specialization) {
+      where.category = { specialization };
+    }
+
+    /* ---------- SEARCH ---------- */
+    if (search) {
+      where.OR = [
+        { title: { contains: search, mode: "insensitive" } },
+        { id: { contains: search, mode: "insensitive" } },
+        { hostel: { name: { contains: search, mode: "insensitive" } } },
+      ];
+    }
+
+    /* ---------- STATUS ---------- */
     if (status && status !== "ALL") {
       where.status = status;
     } else if (unresolvedOnly && !isSpecificView) {
-      // If public feed, hide CLOSED (keep RESOLVED visible)
       where.status = { notIn: ["CLOSED"] };
     }
 
-    // B. Duplicate Filter
-    // Hide duplicates ONLY if it's the public feed
-    if (!isSpecificView && userRole !== 'ADMIN') {
+    /* ---------- DUPLICATES ---------- */
+    if (!isSpecificView && userRole !== "ADMIN") {
       where.isDuplicate = false;
     }
 
-    // ---------------------------
+    /* ---------- VISIBILITY (FIXED) ---------- */
+    if (userRole === "ADMIN") {
+      if (visibility && visibility !== "ALL") {
+        where.visibility = visibility.toUpperCase(); // PUBLIC / PRIVATE
+      }
+    } else {
+      // Students NEVER see private issues
+      where.visibility = "PUBLIC";
+    }
 
-    const orderBy = sort === "oldest" ? { createdAt: "asc" } : { createdAt: "desc" };
+    const orderBy =
+      sort === "oldest" ? { createdAt: "asc" } : { createdAt: "desc" };
 
     const include = {
       _count: { select: { upvotes: true } },
-      hostel: { select: { name: true } },  
+      hostel: { select: { name: true } },
       block: { select: { name: true } },
       room: { select: { number: true } },
-      category: { select: { name: true } },
-      
-      // 3. IMPORTANT: Include merged issue details so the card can link to it
-      mergedWith: { select: { id: true, status: true, title: true } } 
+      category: { select: { name: true, specialization: true } },
+      mergedWith: { select: { id: true, status: true, title: true } },
     };
 
     if (userId) {
-      include.upvotes = { where: { userId }, select: { userId: true } };
+      include.upvotes = {
+        where: { userId },
+        select: { userId: true },
+      };
     }
 
-    const issues = await prisma.issue.findMany({
-      where,
-      orderBy,
-      include,
-      skip,
-      take: limit,
-    });
+    const [issues, total] = await Promise.all([
+      prisma.issue.findMany({
+        where,
+        orderBy,
+        include,
+        skip,
+        take: limit,
+      }),
+      prisma.issue.count({ where }),
+    ]);
 
-    return NextResponse.json({ issues }, { status: 200 }); // Return object structure consistently
+   return NextResponse.json(
+  {
+    data: issues,   // For Management/Admin dashboard
+    issues: issues, // For Student ClientDashboard compatibility
+    meta: {
+      total,
+      page,
+      limit,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    },
+  },
+  { status: 200 }
+);
   } catch (error) {
     console.error("GET /api/issues error:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 }
+    );
   }
 }

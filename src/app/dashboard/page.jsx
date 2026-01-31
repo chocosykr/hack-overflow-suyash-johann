@@ -18,8 +18,13 @@ function DrilldownIssues({ hostel, block }) {
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState(null);
 
+  // Normalize inputs: extract the name if they are objects
+  const hostelName = typeof hostel === 'object' ? hostel.name : hostel;
+  const blockName = typeof block === 'object' ? block.name : block;
+
   React.useEffect(() => {
-    if (!hostel || !block) return;
+    // Use the normalized strings for the check and the fetch
+    if (!hostelName || !blockName) return;
 
     const controller = new AbortController();
     const signal = controller.signal;
@@ -29,37 +34,29 @@ function DrilldownIssues({ hostel, block }) {
       setError(null);
 
       try {
-        const url = `/api/issues?hostel=${encodeURIComponent(hostel)}&block=${encodeURIComponent(block)}`;
+        // 1. EXTRACT THE NAMES: Ensure we are sending strings, not objects
+        const hName = typeof hostel === 'object' ? hostel.name : hostel;
+        const bName = typeof block === 'object' ? block.name : block;
+
+        // 2. BUILD THE URL: Using the strings
+        // Add &unresolved=true to the URL to match the Heatmap's likely logic
+        // Add unresolved=false to ensure the list shows EVERYTHING the heatmap counted
+        const url = `/api/issues?hostel=${encodeURIComponent(hName)}&block=${encodeURIComponent(bName)}&unresolved=false`;
         const res = await fetch(url, { signal });
 
-        // handle non-2xx
         if (!res.ok) {
           const txt = await res.text();
           throw new Error(`API error: ${res.status} ${txt}`);
         }
 
+        // Inside DrilldownIssues load() function
         const payload = await res.json();
+        setIssues(payload.data || []); // matches the new API return key
 
-        // normalize common shapes: array, {data: array}, {issues: array}
-        let list = [];
-        if (Array.isArray(payload)) {
-          list = payload;
-        } else if (payload?.data && Array.isArray(payload.data)) {
-          list = payload.data;
-        } else if (payload?.issues && Array.isArray(payload.issues)) {
-          list = payload.issues;
-        } else {
-          // defensive fallback: try to extract plausible array from top-level fields
-          const candidates = Object.values(payload).filter(v => Array.isArray(v));
-          list = candidates[0] ?? [];
-        }
-
-        setIssues(list);
       } catch (err) {
         if (err.name !== "AbortError") {
-          console.error("Drilldown load error:", err);
           setError(err.message || "Failed to load issues");
-          setIssues([]); // ensure array
+          setIssues([]);
         }
       } finally {
         setLoading(false);
@@ -68,9 +65,9 @@ function DrilldownIssues({ hostel, block }) {
 
     load();
     return () => controller.abort();
-  }, [hostel, block]);
+  }, [hostelName, blockName]); // Depend on strings, not objects
 
-  if (!hostel || !block) {
+  if (!hostelName || !blockName) {
     return <div className="text-sm text-gray-500">Select a block to view issues</div>;
   }
 
@@ -80,7 +77,8 @@ function DrilldownIssues({ hostel, block }) {
   return (
     <div>
       <h4 className="text-sm font-bold text-gray-900 mb-3">
-        Issues · {hostel} / Block {block}
+        {/* FIXED: Rendering strings instead of objects */}
+        Issues · {hostelName} / Block {blockName}
       </h4>
 
       {issues.length === 0 ? (
@@ -91,7 +89,8 @@ function DrilldownIssues({ hostel, block }) {
             <li key={issue.id} className="p-3 border rounded-md text-sm hover:bg-gray-50">
               <div className="font-medium">{issue.title ?? issue.id}</div>
               <div className="text-xs text-gray-500">
-                {issue.category ?? "—"} · {issue.status ?? "—"}
+                {/* Updated to handle nested category object */}
+                {issue.category?.name || issue.category || "General"} · {issue.status}
               </div>
             </li>
           ))}
@@ -125,14 +124,8 @@ export default function Page() {
           </p>
         </div>
         <div className="flex gap-2">
-          <button className="flex items-center gap-2 px-3 py-2 bg-white border rounded-md text-sm">
-            <Filter className="w-4 h-4" /> Filter
-          </button>
-          <button className="flex items-center gap-2 px-3 py-2 bg-white border rounded-md text-sm">
-            <Download className="w-4 h-4" /> Export
-          </button>
           <button className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm">
-            + New Issue
+            + New announcement
           </button>
         </div>
       </header>

@@ -133,3 +133,4 @@ HostelHeatmap.propTypes = {
   onCellClick: PropTypes.func,
   rightPane: PropTypes.node,
 };
+ 

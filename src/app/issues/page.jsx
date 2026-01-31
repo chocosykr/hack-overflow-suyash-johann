@@ -135,7 +135,7 @@ export default function IssuesPage() {
 
       {/* Table Section */}
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto relative min-h-[400px]">
+        <div className="overflow-x-auto relative min-h-100">
           {loading && (
             <div className="absolute inset-0 bg-white/60 flex items-center justify-center z-10 backdrop-blur-[1px]">
               <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
