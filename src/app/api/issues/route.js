@@ -2,110 +2,128 @@ import { NextResponse } from "next/server";
 import { prisma } from "../../../lib/prisma";
 import { auth } from "../../auth";
 
+// Helper from 'main' branch
+function clean(val) {
+  if (!val) return null;
+  return String(val).split(/[?&]/)[0].trim();
+}
+
 export async function GET(request) {
   try {
     const session = await auth();
-    const userId = session?.user?.id || null;
-    const userRole = session?.user?.role || "STUDENT";
+    // Allow public fetch if needed, but usually restrict
+    // const userId = session?.user?.id || null; // If you want to allow guests
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const userId = session.user.id;
+    const userRole = session.user.role ?? "STUDENT";
 
     const { searchParams } = new URL(request.url);
-    const hostel = searchParams.get("hostel");
-    const block = searchParams.get("block");
-    const status = searchParams.get("status");
-    const search = searchParams.get("search");
-    const assigneeId = searchParams.get("assigneeId");
-    const specialization = searchParams.get("specialization");
-    const priority =searchParams.get("priority");
-    const category = searchParams.get("category");
+
+    // 1. EXTRACT & CLEAN PARAMS (Merged list)
+    const hostel = clean(searchParams.get("hostel"));
+    const block = clean(searchParams.get("block"));
+    const status = clean(searchParams.get("status"));
+    const search = clean(searchParams.get("search"));
+    const assigneeId = clean(searchParams.get("assigneeId"));
+    const reporterId = clean(searchParams.get("reporterId"));
+    const specialization = clean(searchParams.get("specialization"));
+    const priority = clean(searchParams.get("priority"));
+    const category = clean(searchParams.get("category")); // From HEAD
+    const visibility = clean(searchParams.get("visibility"));
+
+    const sort = clean(searchParams.get("sort")) || "newest";
     
-    // 1. NEW PARAM: Allow filtering by Reporter (for "My Issues")
-    const reporterId = searchParams.get("reporterId"); 
-    
-    const sort = searchParams.get("sort") || "newest";
-    const page = Math.max(1, Number(searchParams.get("page") || 1));
-    const limit = Math.min(100, Math.max(5, Number(searchParams.get("limit") || 25)));
+    // Pagination (from main)
+    const page = Math.max(1, Number(clean(searchParams.get("page")) || 1));
+    const limit = Math.min(100, Math.max(5, Number(clean(searchParams.get("limit")) || 15)));
     const skip = (page - 1) * limit;
 
-    // 2. LOGIC: When should we show duplicates/closed issues?
-    // If we are searching, looking at "My Issues", or looking at "Assigned to Me", show everything.
-    // Otherwise (Public Feed), hide duplicates and closed issues.
-    const isSpecificView = reporterId || assigneeId || search || status === "ALL";
+    const unresolvedOnly = clean(searchParams.get("unresolved")) !== "false";
 
-    // Default "Unresolved" logic: Only apply if we are NOT in a specific view
-    // (e.g. In "My Issues", I want to see my Closed/Duplicate issues too)
-    const unresolvedOnly = searchParams.get("unresolved") !== "false";
+    // "Specific View" allows seeing duplicates and private issues (e.g. My Issues, Search)
+    const isSpecificView = Boolean(reporterId || assigneeId || search || status === "ALL");
 
+    // 2. CONSTRUCT 'WHERE' CLAUSE
     const where = {
-      // REMOVED "isDuplicate: false" from here. We handle it conditionally below.
-      
+      // Direct filters
       ...(hostel && { hostel: { name: hostel } }), 
       ...(block && { block: { name: block } }),
       ...(assigneeId && { assigneeId }),
-      ...(reporterId && { reporterId }), // Add to query
+      ...(reporterId && { reporterId }),
+      ...(priority && { priority }),
       
+      // Category Filter (From HEAD)
+      ...(category && category !== "All Categories" && { 
+         category: { name: category } 
+      }),
       
+      // Specialization Filter (for Staff)
       ...(specialization && { 
          category: { specialization: specialization } 
       }),
 
-      ...(category && category !== "All Categories" && { 
-         category: { name: category } 
-      }),
-
+      // Search Logic (Combined: Title + Hostel + ID)
       ...(search && {
         OR: [
           { title: { contains: search, mode: "insensitive" } },
+          { id: { contains: search, mode: "insensitive" } }, // Added ID search from main
           { hostel: { name: { contains: search, mode: "insensitive" } } }, 
         ],
       }),
     };
 
-    // --- CONDITIONAL FILTERS ---
-
-    // A. Status Filter
+    // 3. STATUS FILTER
     if (status && status !== "ALL") {
       where.status = status;
     } else if (unresolvedOnly && !isSpecificView) {
-      // If public feed, hide CLOSED (keep RESOLVED visible)
       where.status = { notIn: ["CLOSED"] };
     }
 
-    // B. Duplicate Filter
-    // Hide duplicates ONLY if it's the public feed
-    if (!isSpecificView && userRole !== 'ADMIN') {
+    // 4. DUPLICATE FILTER
+    // Only hide duplicates if browsing the public feed
+    if (!isSpecificView && userRole !== "ADMIN") {
       where.isDuplicate = false;
     }
 
-    // ---------------------------
-    let orderBy;
+    // 5. VISIBILITY FILTER (The Fix)
+    // Admin sees filter choice. Students see PUBLIC, UNLESS it's their own issue (isSpecificView)
+    if (userRole === "ADMIN") {
+      if (visibility && visibility !== "ALL") {
+        where.visibility = visibility.toUpperCase();
+      }
+    } else {
+      // If I'm not looking at a specific view (like "My Reports"), force PUBLIC
+      if (!isSpecificView) {
+        where.visibility = "PUBLIC";
+      }
+    }
 
+    // 6. SORTING LOGIC (From HEAD - supports Priority/Upvotes)
+    let orderBy;
     if (sort === 'priority') {
-      // 1. PRIORITY SORT (with Date as Secondary)
-      // Emergency -> High -> Medium -> Low. Within each, Newest first.
       orderBy = [
         { priority: "desc" }, 
         { createdAt: "desc" }
       ];
     } else if (sort === 'oldest') {
-      // 2. OLDEST FIRST
       orderBy = { createdAt: "asc" };
     } else if (sort === 'most_upvoted') {
-       // 3. MOST UPVOTED
        orderBy = { upvotes: { _count: "desc" } };
     } else {
-      // 4. DEFAULT: NEWEST FIRST (Pure Date Sort)
       orderBy = { createdAt: "desc" };
     }
 
+    // 7. INCLUDES
     const include = {
       _count: { select: { upvotes: true } },
-      hostel: { select: { name: true } },  
+      hostel: { select: { name: true } },
       block: { select: { name: true } },
       room: { select: { number: true } },
-      category: { select: { name: true } },
-      
-      // 3. IMPORTANT: Include merged issue details so the card can link to it
-      mergedWith: { select: { id: true, status: true, title: true } } 
+      category: { select: { name: true, specialization: true } },
+      mergedWith: { select: { id: true, status: true, title: true } }, // Important for UI
     };
 
     if (userId) {
@@ -115,17 +133,39 @@ export async function GET(request) {
       };
     }
 
-    const issues = await prisma.issue.findMany({
-      where,
-      orderBy,
-      include,
-      skip,
-      take: limit,
-    });
+    // 8. FETCH DATA & COUNT (Parallel for performance)
+    const [issues, total] = await Promise.all([
+      prisma.issue.findMany({
+        where,
+        orderBy,
+        include,
+        skip,
+        take: limit,
+      }),
+      prisma.issue.count({ where }),
+    ]);
 
-    return NextResponse.json({ issues }, { status: 200 }); // Return object structure consistently
+    // 9. RETURN UNIFIED RESPONSE
+    // Returns 'issues' (for Student Dashboard) AND 'data' (for Admin/Teammate's Dashboard)
+    return NextResponse.json(
+      {
+        issues: issues, 
+        data: issues,   
+        meta: {
+          total,
+          page,
+          limit,
+          totalPages: Math.max(1, Math.ceil(total / limit)),
+        },
+      },
+      { status: 200 }
+    );
+
   } catch (error) {
     console.error("GET /api/issues error:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 }
+    );
   }
 }

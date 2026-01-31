@@ -2,54 +2,60 @@ import { prisma } from "../../../../lib/prisma";
 
 export async function GET() {
   try {
-    // Active issues
-    const activeIssues = await prisma.issue.count({
-      where: {
-        status: {
-          in: ["REPORTED", "ASSIGNED", "IN_PROGRESS"],
+    // 1. Parallel execution for high performance
+    const [activeIssues, resolvedIssues, occupancy] = await Promise.all([
+      // Count issues that are currently being worked on
+      prisma.issue.count({
+        where: {
+          isDuplicate: false,
+          status: { in: ["REPORTED", "ASSIGNED", "IN_PROGRESS"] },
         },
-      },
-    });
+      }),
 
-    // Avg resolution time (using updatedAt)
-    const resolvedIssues = await prisma.issue.findMany({
-      where: { status: "RESOLVED" },
-      select: {
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
+      // Fetch timestamps for the average calculation
+      // Using resolvedAt as per your schema
+      prisma.issue.findMany({
+        where: { 
+          status: "RESOLVED",
+          resolvedAt: { not: null } // Safety check
+        },
+        select: {
+          createdAt: true,
+          resolvedAt: true,
+        },
+      }),
 
-    const avgResolution =
-      resolvedIssues.length === 0
-        ? 0
-        : Math.round(
-            resolvedIssues.reduce((sum, i) => {
-              return (
-                sum +
-                (i.updatedAt.getTime() - i.createdAt.getTime()) /
-                  (1000 * 60 * 60)
-              );
-            }, 0) / resolvedIssues.length
-          );
+      // Count students
+      prisma.user.count({
+        where: { role: "STUDENT" },
+      }),
+    ]);
 
-    // Resolved this month
-    const startOfMonth = new Date(
-      new Date().getFullYear(),
-      new Date().getMonth(),
-      1
-    );
+    // 2. Calculate Average Resolution Time
+    let avgResolution = 0;
+    if (resolvedIssues.length > 0) {
+      const totalTimeMs = resolvedIssues.reduce((sum, issue) => {
+        // resolvedAt is the definitive timestamp for the fix
+        const duration = issue.resolvedAt.getTime() - issue.createdAt.getTime();
+        return sum + duration;
+      }, 0);
+
+      // (Total MS / Count) / (MS in an hour)
+      avgResolution = Math.round(
+        totalTimeMs / resolvedIssues.length / (1000 * 60 * 60)
+      );
+    }
+
+    // 3. Monthly Metrics
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
 
     const resolvedThisMonth = await prisma.issue.count({
       where: {
         status: "RESOLVED",
-        updatedAt: { gte: startOfMonth },
+        resolvedAt: { gte: startOfMonth },
       },
-    });
-
-    // Occupancy = number of students
-    const occupancy = await prisma.user.count({
-      where: { role: "STUDENT" },
     });
 
     return Response.json({
@@ -58,6 +64,7 @@ export async function GET() {
       resolvedThisMonth,
       occupancy,
     });
+    
   } catch (err) {
     console.error("Summary API error:", err);
     return Response.json(

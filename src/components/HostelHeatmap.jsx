@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import PropTypes from "prop-types"; 
+import PropTypes from "prop-types";
 
 /**
  * Layout:
@@ -33,13 +33,23 @@ export default function HostelHeatmap({ since, until, onCellClick, rightPane }) 
   }, [since, until]);
 
   const { hostels, blocks, grid, maxCount } = React.useMemo(() => {
-    const hostels = [...new Set(data.map(d => d.hostel))].sort();
-    const blocks = [...new Set(data.map(d => d.block))].sort();
+    // 1. Extract the name strings if they are objects, otherwise keep as is
+    const hostels = [...new Set(data.map(d =>
+      typeof d.hostel === 'object' ? d.hostel.name : d.hostel
+    ))].sort();
+
+    const blocks = [...new Set(data.map(d =>
+      typeof d.block === 'object' ? d.block.name : d.block
+    ))].sort();
 
     const map = {};
     data.forEach(d => {
-      map[d.hostel] ??= {};
-      map[d.hostel][d.block] = d;
+      // Normalize h and b to strings for the map keys
+      const h = typeof d.hostel === 'object' ? d.hostel.name : d.hostel;
+      const b = typeof d.block === 'object' ? d.block.name : d.block;
+
+      map[h] ??= {};
+      map[h][b] = d;
     });
 
     const grid = hostels.map(h =>
@@ -123,3 +133,4 @@ HostelHeatmap.propTypes = {
   onCellClick: PropTypes.func,
   rightPane: PropTypes.node,
 };
+ 
