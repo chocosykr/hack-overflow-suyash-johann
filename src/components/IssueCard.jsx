@@ -39,7 +39,10 @@ export default function IssueCard({ issue, currentUserId }) {
             <Badge variant={issue.status === 'RESOLVED' ? "default" : "secondary"}>
               {issue.status}
             </Badge>
-            <span className="text-xs text-muted-foreground">{issue.category}</span>
+            <span className="text-xs text-muted-foreground">
+              {issue.category?.name}
+            </span>
+
           </div>
           <CardTitle className="text-lg">{issue.title}</CardTitle>
         </div>
@@ -57,11 +60,11 @@ export default function IssueCard({ issue, currentUserId }) {
         <span className="text-xs text-gray-400">
           {new Date(issue.createdAt).toLocaleDateString('en-IN')}
         </span>
-        
+
         {/* The "Me Too" Button */}
-        <Button 
-          variant={optimisticState.hasUpvoted ? "default" : "outline"} 
-          size="sm" 
+        <Button
+          variant={optimisticState.hasUpvoted ? "default" : "outline"}
+          size="sm"
           onClick={handleUpvote}
           className="flex items-center gap-2"
         >

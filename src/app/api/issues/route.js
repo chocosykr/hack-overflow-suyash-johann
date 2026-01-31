@@ -1,101 +1,82 @@
-
 import { NextResponse } from "next/server";
 import { prisma } from "../../../lib/prisma";
-import { auth } from "../../auth"; // Import your auth utility
+import { auth } from "../../auth";
 
 export async function GET(request) {
   try {
-
-    const session = await auth(); // Get the actual session
-    const userId = session?.user?.id || null; // Identify the user
-    const role = session?.user?.role || "STUDENT"; // Default to student
+    const session = await auth();
+    const userId = session?.user?.id || null;
+    const role = session?.user?.role || "STUDENT";
 
     const { searchParams } = new URL(request.url);
 
-    // Filter & Search Params
     const hostel = searchParams.get("hostel");
     const block = searchParams.get("block");
     const status = searchParams.get("status");
     const priority = searchParams.get("priority");
     const search = searchParams.get("search");
     const sort = searchParams.get("sort") || "newest";
+    const visibility = searchParams.get("visibility");
 
-    // Pagination Params
-    const unresolvedOnly = searchParams.get("unresolved") !== "false";
     const page = Math.max(1, Number(searchParams.get("page") || 1));
-    const limit = Math.min(100, Math.max(5, Number(searchParams.get("limit") || 25)));
+    const limit = Math.min(100, Math.max(5, Number(searchParams.get("limit") || 15)));
     const skip = (page - 1) * limit;
 
-
-    /** ------------------------
-     * Build WHERE clause
-     * ------------------------ */
+    /** --- Build WHERE clause --- **/
     const where = {
       isDuplicate: false,
-
-      ...(role !== "ADMIN" && { visibility: "PUBLIC" }),
-
-      ...(hostel && {
-        hostel: { name: hostel },
-      }),
-
-      ...(block && {
-        block: { name: block },
-      }),
-
+      // CORRECTED: Combined security and filter logic into one block
+      ...(role !== "ADMIN" 
+        ? { visibility: "PUBLIC" } 
+        : (visibility && visibility !== "all" 
+            ? { visibility: visibility.toUpperCase() } 
+            : {})
+      ),
+      ...(hostel && { hostel: { name: hostel } }),
+      ...(block && { block: { name: block } }),
       ...(priority && { priority }),
-
       ...(search && {
         OR: [
           { id: { contains: search, mode: "insensitive" } },
           { title: { contains: search, mode: "insensitive" } },
-          {
-            hostel: {
-              name: { contains: search, mode: "insensitive" },
-            },
-          },
+          { hostel: { name: { contains: search, mode: "insensitive" } } },
         ],
       }),
-
       ...(status && status !== "ALL"
         ? { status }
-        : unresolvedOnly && !status
-          ? { status: { notIn: ["RESOLVED", "CLOSED"] } }
-          : {}),
+        : { status: { notIn: ["RESOLVED", "CLOSED"] } }),
     };
 
-
-    /** ------------------------
-     * Handle Sorting & Relations
-     * ------------------------ */
     const orderBy = sort === "oldest" ? { createdAt: "asc" } : { createdAt: "desc" };
 
     const include = {
       _count: { select: { upvotes: true } },
+      hostel: { select: { name: true } },
+      block: { select: { name: true } },
+      category: { select: { name: true } },
     };
 
     if (userId) {
-      include.upvotes = {
-        where: { userId },
-        select: { userId: true },
-      };
+      include.upvotes = { where: { userId }, select: { userId: true } };
     }
 
-    // Execute Query
-    const issues = await prisma.issue.findMany({
-      where,
-      orderBy,
-      include,
-      skip,
-      take: limit,
-    });
+    const [issues, totalCount] = await Promise.all([
+      prisma.issue.findMany({ where, orderBy, include, skip, take: limit }),
+      prisma.issue.count({ where })
+    ]);
 
-    return NextResponse.json(issues, { status: 200 });
+    return NextResponse.json({
+      data: issues,
+      meta: {
+        total: totalCount,
+        page,
+        limit,
+        totalPages: Math.ceil(totalCount / limit)
+      }
+    }, { status: 200 });
+
   } catch (error) {
     console.error("GET /api/issues error:", error);
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
