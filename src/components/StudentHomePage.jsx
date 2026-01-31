@@ -88,6 +88,9 @@ export default function StudentHomePage({user}) {
                 data-[state=active]:text-white 
                 data-[state=active]:shadow-lg
                 data-[state=active]:shadow-blue-500/30
+                data-[state=inactive]:text-gray-600
+                data-[state=inactive]:hover:bg-blue-50
+                data-[state=inactive]:hover:text-blue-700
                 rounded-lg
                 py-3
                 font-semibold
@@ -106,6 +109,9 @@ export default function StudentHomePage({user}) {
                 data-[state=active]:text-white 
                 data-[state=active]:shadow-lg
                 data-[state=active]:shadow-purple-500/30
+                data-[state=inactive]:text-gray-600
+                data-[state=inactive]:hover:bg-purple-50
+                data-[state=inactive]:hover:text-purple-700
                 rounded-lg
                 py-3
                 font-semibold
