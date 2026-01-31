@@ -90,7 +90,7 @@ export async function GET(request) {
 
     // 5. VISIBILITY FILTER (The Fix)
     // Admin sees filter choice. Students see PUBLIC, UNLESS it's their own issue (isSpecificView)
-    if (userRole === "ADMIN") {
+    if (userRole === "ADMIN"|| userRole === "STAFF") {
       if (visibility && visibility !== "ALL") {
         where.visibility = visibility.toUpperCase();
       }
