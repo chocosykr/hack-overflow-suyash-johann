@@ -1,10 +1,19 @@
 import { prisma } from "../../../../lib/prisma";
+import { auth } from "../../../auth";
+import { NextResponse } from "next/server";
 
 export async function GET() {
   try {
-    // 1. Parallel execution for high performance
+    // 1. Strict Access Control
+    const session = await auth();
+    if (!session?.user || (session.user.role !== "ADMIN" && session.user.role !== "STAFF")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // 2. Parallel execution for high performance
+    // Note: We include private issues because Admins need a total workload view
     const [activeIssues, resolvedIssues, occupancy] = await Promise.all([
-      // Count issues that are currently being worked on
+      // Count unique open issues
       prisma.issue.count({
         where: {
           isDuplicate: false,
@@ -12,12 +21,11 @@ export async function GET() {
         },
       }),
 
-      // Fetch timestamps for the average calculation
-      // Using resolvedAt as per your schema
+      // Fetch timestamps for accurate average calculation
       prisma.issue.findMany({
-        where: { 
+        where: {
           status: "RESOLVED",
-          resolvedAt: { not: null } // Safety check
+          resolvedAt: { not: null } 
         },
         select: {
           createdAt: true,
@@ -25,28 +33,29 @@ export async function GET() {
         },
       }),
 
-      // Count students
+      // Count total student population
       prisma.user.count({
         where: { role: "STUDENT" },
       }),
     ]);
 
-    // 2. Calculate Average Resolution Time
+    // 3. Robust Average Resolution Time Calculation
     let avgResolution = 0;
-    if (resolvedIssues.length > 0) {
-      const totalTimeMs = resolvedIssues.reduce((sum, issue) => {
-        // resolvedAt is the definitive timestamp for the fix
-        const duration = issue.resolvedAt.getTime() - issue.createdAt.getTime();
-        return sum + duration;
-      }, 0);
+    const validIssues = resolvedIssues.filter(
+      issue => issue.resolvedAt.getTime() > issue.createdAt.getTime()
+    );
 
-      // (Total MS / Count) / (MS in an hour)
-      avgResolution = Math.round(
-        totalTimeMs / resolvedIssues.length / (1000 * 60 * 60)
+    if (validIssues.length > 0) {
+      const totalTimeMs = validIssues.reduce(
+        (sum, issue) => sum + (issue.resolvedAt.getTime() - issue.createdAt.getTime()), 
+        0
       );
+      
+      // Convert MS to Hours
+      avgResolution = Math.round(totalTimeMs / validIssues.length / (1000 * 60 * 60));
     }
 
-    // 3. Monthly Metrics
+    // 4. Monthly Performance Metric
     const startOfMonth = new Date();
     startOfMonth.setDate(1);
     startOfMonth.setHours(0, 0, 0, 0);
@@ -55,20 +64,21 @@ export async function GET() {
       where: {
         status: "RESOLVED",
         resolvedAt: { gte: startOfMonth },
+        isDuplicate: false, // Standardize duplicate handling
       },
     });
 
-    return Response.json({
+    return NextResponse.json({
       activeIssues,
       avgResolution: `${avgResolution}h`,
       resolvedThisMonth,
       occupancy,
     });
-    
+
   } catch (err) {
     console.error("Summary API error:", err);
-    return Response.json(
-      { error: "Failed to fetch dashboard summary" },
+    return NextResponse.json(
+      { error: "Internal Server Error" },
       { status: 500 }
     );
   }

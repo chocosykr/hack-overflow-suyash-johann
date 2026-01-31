@@ -126,7 +126,7 @@ export default function HostelHeatmap({ since, until, onCellClick, rightPane }) 
     </section>
   );
 }
-
+ 
 HostelHeatmap.propTypes = {
   since: PropTypes.string,
   until: PropTypes.string,

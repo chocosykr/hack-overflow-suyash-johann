@@ -1,19 +1,23 @@
-// /app/api/analytics/status-distribution/route.js
 import { prisma } from "../../../../lib/prisma";
+import { auth } from "../../../auth";
 
 export async function GET() {
   try {
-    const resolvedCount = await prisma.issue.count({
-      where: { status: "RESOLVED" },
-    });
+    const session = await auth();
+    
+    // Strict Admin-only check
+    if (!session?.user || session.user.role !== "ADMIN") {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
+    }
 
-    const inProgressCount = await prisma.issue.count({
-      where: { status: "IN_PROGRESS" },
-    });
+    // Standard filter to exclude duplicates for accuracy
+    const baseWhere = { isDuplicate: false };
 
-    const pendingCount = await prisma.issue.count({
-      where: { status: { in: ["REPORTED", "ASSIGNED"] } },
-    });
+    const [resolvedCount, inProgressCount, pendingCount] = await Promise.all([
+      prisma.issue.count({ where: { ...baseWhere, status: "RESOLVED" } }),
+      prisma.issue.count({ where: { ...baseWhere, status: "IN_PROGRESS" } }),
+      prisma.issue.count({ where: { ...baseWhere, status: { in: ["REPORTED", "ASSIGNED"] } } }),
+    ]);
 
     const data = [
       { name: "Resolved", value: resolvedCount, color: "#10b981" },
@@ -24,6 +28,6 @@ export async function GET() {
     return new Response(JSON.stringify(data), { status: 200 });
   } catch (err) {
     console.error(err);
-    return new Response(JSON.stringify({ error: "Failed to fetch status distribution" }), { status: 500 });
+    return new Response(JSON.stringify({ error: "Failed to fetch" }), { status: 500 });
   }
 }
