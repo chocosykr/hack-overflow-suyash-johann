@@ -1,5 +1,5 @@
 "use client"
-import IssueCard from './IssueCard'
+import CompactIssueRow from "./CompactIssueRow"
 import { useState, useEffect } from 'react'
 import { Loader2, ClipboardList } from 'lucide-react'
 
@@ -49,9 +49,9 @@ export default function ClientDashboard({ userId, fetchUrl, emptyMessage }) {
   }
 
   return (
-    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+   <div className="space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-500">
       {issues.map((issue) => (
-        <IssueCard 
+        <CompactIssueRow 
           key={issue.id} 
           issue={issue} 
           currentUserId={userId} 
