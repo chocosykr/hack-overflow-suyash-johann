@@ -1,25 +1,32 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
+import { auth } from "../../../auth";
+
+// Define what "Active" means consistently across the app
+const ACTIVE_STATUSES = ["REPORTED", "ASSIGNED", "IN_PROGRESS"];
 
 export async function GET(req) {
   try {
+    // 1. Strict Access Control
+    const session = await auth();
+    if (!session?.user || (session.user.role !== "ADMIN" && session.user.role !== "STAFF")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const url = new URL(req.url);
     const hostelId = url.searchParams.get("hostelId");
     const sinceRaw = url.searchParams.get("since");
     const untilRaw = url.searchParams.get("until");
 
-    // validate dates
     const since = sinceRaw ? new Date(sinceRaw) : null;
     const until = untilRaw ? new Date(untilRaw) : null;
-    if (sinceRaw && isNaN(since.getTime())) {
-      return NextResponse.json({ error: "Invalid 'since' date" }, { status: 400 });
-    }
-    if (untilRaw && isNaN(until.getTime())) {
-      return NextResponse.json({ error: "Invalid 'until' date" }, { status: 400 });
-    }
 
-    // build where clause defensively
-    const where = {};
+    // 2. Build 'where' clause
+    const where = {
+      isDuplicate: false,
+      status: { in: ACTIVE_STATUSES }, // 🔹 ONLY ACTIVE ISSUES
+    };
+
     if (hostelId) where.hostelId = hostelId;
     if (since || until) {
       where.createdAt = {};
@@ -27,23 +34,18 @@ export async function GET(req) {
       if (until) where.createdAt.lte = until;
     }
 
-    // group by categoryId and count issues
+    // 3. Group by category and count
     const groups = await prisma.issue.groupBy({
       by: ["categoryId"],
       where,
       _count: { id: true },
     });
 
-    if (!groups || groups.length === 0) {
-      return NextResponse.json([], { status: 200 });
-    }
+    if (!groups.length) return NextResponse.json([]);
 
     const categoryIds = groups.map((g) => g.categoryId).filter(Boolean);
-    if (categoryIds.length === 0) {
-      // defensive: no valid category ids
-      return NextResponse.json([], { status: 200 });
-    }
 
+    // 4. Resolve Category Names
     const categories = await prisma.issueCategory.findMany({
       where: { id: { in: categoryIds } },
       select: { id: true, name: true },
@@ -58,10 +60,9 @@ export async function GET(req) {
       }))
       .sort((a, b) => b.issues - a.issues);
 
-    return NextResponse.json(result, { status: 200 });
+    return NextResponse.json(result);
   } catch (err) {
-    // log full error for server-side debugging
-    console.error("GET /api/analytics/categories error:", err?.message ?? err, err?.stack ?? "");
+    console.error("Category Analytics error:", err);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
